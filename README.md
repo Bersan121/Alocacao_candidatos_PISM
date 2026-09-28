@@ -12,7 +12,7 @@ O script `gerador_instancias.py` cria arquivos de instâncias formatados para le
   - Número de escolas configurável (padrão: 10 a 20 escolas).
   - Capacidade total por escola configurável (padrão: 200 a 500 alunos).
   - Número de salas por escola configurável (padrão: 5 a 15 salas).
-  - Divisão da capacidade da escola entre as salas garantindo que $\sum \text{capacidades\_salas} = \text{capacidade\_total}$.
+  - Divisão da capacidade da escola entre as salas garantindo que a capacidade total da escola seja igual a soma da capacidade de cada sala.
   - CEPs sorteados a partir da lista oficial de 20 CEPs de escolas de Juiz de Fora (apenas números, sem hífen).
 
 - **Candidatos**:

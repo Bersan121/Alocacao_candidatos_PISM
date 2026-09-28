@@ -1,0 +1,41 @@
+# Executáveis e arquivos binários compilados (C / C++)
+*.out
+*.exe
+*.o
+*.obj
+*.a
+*.la
+*.lo
+*.so
+*.dylib
+*.dll
+
+# Binários genéricos sem extensão comuns em Linux (podem ser ignorados ou adicionados especificamente)
+bin/
+build/
+dist/
+target/
+
+# Python: cache e ambientes virtuais
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+ENV/
+
+# Configurações de IDEs e Editores de Código
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Arquivos temporários e logs
+*.log
+*.tmp

@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Gerador de Instâncias para Problema NP-Difícil de Alocação / Ensalamento
+Gerador de Instâncias para Problema NP-Difícil de Alocação / Ensalamento (PISM)
 -------------------------------------------------------------------------
 Este script gera instâncias sintéticas personalizadas contendo informações de
 escolas (capacidade total, salas e capacidades individuais), candidatos (CEP e tipo de prova)
 e uma Matriz de Distâncias Euclidiana entre Candidatos e Escolas baseada em geolocalização por CEP.
 
-Todos os parâmetros principais podem ser alterados nas VARIÁVEIS GLOBAIS abaixo
-ou via linha de comando (CLI).
+Formatado estritamente de acordo com o modelo padronizado do projeto.
 """
 
 import os
@@ -16,9 +15,10 @@ import math
 import random
 import json
 import argparse
+import time
 import urllib.request
 import urllib.parse
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 # ==============================================================================
 # VARIÁVEIS GLOBAIS DE CONFIGURAÇÃO (Altere aqui se desejar)
@@ -57,19 +57,19 @@ CEPS_ESCOLAS_JF: List[str] = [
 # Tipos de prova dos candidatos
 TIPOS_PROVA: List[str] = ["M1", "M2", "M3e", "M3s", "M3h", "M3d"]
 
-# CEPs de outras cidades da região/estado para candidatos de fora de JF (apenas dígitos)
+# CEPs de logradouros reais de outras cidades da região/estado para candidatos de fora de JF
 CEPS_OUTRAS_CIDADES: List[str] = [
-    "36200010",  # Barbacena - MG
-    "36500010",  # Ubá - MG
+    "36200010",  # Barbacena - MG (Centro)
+    "36500010",  # Ubá - MG (Centro)
     "36150000",  # Santos Dumont - MG
     "36120000",  # Matias Barbosa - MG
     "36140000",  # Lima Duarte - MG
-    "36880000",  # Muriaé - MG
-    "36300000",  # São João del-Rei - MG
+    "36880002",  # Muriaé - MG (Centro)
+    "36300004",  # São João del-Rei - MG (Centro)
     "36600000",  # Bicas - MG
-    "20000000",  # Rio de Janeiro - RJ
-    "25600000",  # Petrópolis - RJ
-    "30100000"   # Belo Horizonte - MG
+    "20040002",  # Rio de Janeiro - RJ (Centro)
+    "25620000",  # Petrópolis - RJ (Centro)
+    "30110000"   # Belo Horizonte - MG (Centro)
 ]
 
 # ==============================================================================
@@ -96,68 +96,97 @@ def salvar_cache_cep(cache: Dict[str, Dict[str, float]], filepath: str = CEP_CAC
         print(f"Erro ao salvar cache de CEPs: {e}")
 
 
+def consultar_api_nominatim(query_str: str) -> Tuple[float, float]:
+    """Consulta o geocodificador Nominatim (OpenStreetMap) por endereço/cidade."""
+    try:
+        url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(query_str)}&format=json"
+        req = urllib.request.Request(url, headers={"User-Agent": "Antigravity-PISM-Geocoder/1.0"})
+        time.sleep(0.5)  # Respeita o rate limit do Nominatim
+        with urllib.request.urlopen(req, timeout=4) as response:
+            res = json.loads(response.read().decode("utf-8"))
+            if res:
+                return float(res[0]["lat"]), float(res[0]["lon"])
+    except Exception:
+        pass
+    return None, None
+
+
 def obter_geolocalizacao_cep(cep: str, cache: Dict[str, Dict[str, float]], cache_file: str = CEP_CACHE_FILE) -> Dict[str, float]:
     """
-    Obtém Latitude e Longitude para um CEP via BrasilAPI v2.
-    Caso o CEP já tenha sido consultado antes, retorna diretamente do cache local.
+    Obtém Latitude e Longitude para um CEP utilizando um pipeline híbrido:
+    1. Cache Local (se já consultado)
+    2. BrasilAPI v2 (retorna coordenadas exatas de CEPs urbanos)
+    3. ViaCEP + OpenStreetMap/Nominatim (para obter coordenadas por rua/bairro/cidade)
     """
     cep_clean = str(cep).replace("-", "").strip()
 
     if cep_clean in cache:
         return cache[cep_clean]
 
-    # Consulta a API BrasilAPI v2
-    url = f"https://brasilapi.com.br/api/cep/v2/{cep_clean}"
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Antigravity/1.0)"})
     lat, lon = None, None
 
+    # 1. Tentar BrasilAPI v2
     try:
-        with urllib.request.urlopen(req, timeout=5) as response:
+        url = f"https://brasilapi.com.br/api/cep/v2/{cep_clean}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=4) as response:
             data = json.loads(response.read().decode("utf-8"))
             coords = data.get("location", {}).get("coordinates", {})
             if coords.get("latitude") and coords.get("longitude"):
-                lat = float(coords["latitude"])
-                lon = float(coords["longitude"])
+                l_lat = float(coords["latitude"])
+                l_lon = float(coords["longitude"])
+                if not (abs(l_lat - (-21.76417)) < 0.0001 and abs(l_lon - (-43.35028)) < 0.0001):
+                    lat, lon = l_lat, l_lon
     except Exception:
         pass
 
-    # Fallback se a API não retornar coordenadas
+    # 2. Tentar ViaCEP + Nominatim (Rua/Bairro/Cidade) se a BrasilAPI não retornou coordenadas específicas
+    if lat is None or lon is None:
+        try:
+            url_via = f"https://viacep.com.br/ws/{cep_clean}/json/"
+            req_via = urllib.request.Request(url_via, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req_via, timeout=4) as response_via:
+                d_via = json.loads(response_via.read().decode("utf-8"))
+                street = d_via.get("logradouro", "")
+                bairro = d_via.get("bairro", "")
+                city = d_via.get("localidade", "")
+                uf = d_via.get("uf", "")
+
+                q = f"{street}, {bairro}, {city} - {uf}, Brasil" if street else f"{city} - {uf}, Brasil"
+                lat, lon = consultar_api_nominatim(q)
+        except Exception:
+            pass
+
+    # 3. Fallback genérico se nada retornar
     if lat is None or lon is None:
         lat, lon = -21.76417, -43.35028
 
-    resultado = {"latitude": lat, "longitude": lon}
+    resultado = {"latitude": round(lat, 6), "longitude": round(lon, 6)}
     cache[cep_clean] = resultado
     salvar_cache_cep(cache, cache_file)
     return resultado
 
 
 def calcular_distancia_euclidiana(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """
-    Calcula a distância euclidiana 2D entre duas coordenadas (lat1, lon1) e (lat2, lon2).
-    """
+    """Calcula a distância euclidiana 2D em graus entre duas coordenadas (lat1, lon1) e (lat2, lon2)."""
     return math.sqrt((lat1 - lat2) ** 2 + (lon1 - lon2) ** 2)
 
 
 def calcular_matriz_distancias(
     candidatos: List[Dict[str, Any]],
-    escolas: List[Dict[str, Any]],
-    cache: Dict[str, Dict[str, float]],
-    cache_file: str = CEP_CACHE_FILE
+    escolas: List[Dict[str, Any]]
 ) -> List[List[float]]:
     """
-    Gera a Matriz de Distâncias Euclidiana (Candidatos x Escolas).
+    Gera a Matriz de Distâncias Euclidiana em graus (Candidatos x Escolas).
     Cada linha i contém as distâncias do candidato i para todas as N escolas.
     """
-    coords_escolas = [obter_geolocalizacao_cep(e["cep"], cache, cache_file) for e in escolas]
-    
     matriz = []
     for cand in candidatos:
-        coord_cand = obter_geolocalizacao_cep(cand["cep"], cache, cache_file)
         linha = []
-        for coord_esc in coords_escolas:
+        for esc in escolas:
             dist = calcular_distancia_euclidiana(
-                coord_cand["latitude"], coord_cand["longitude"],
-                coord_esc["latitude"], coord_esc["longitude"]
+                cand["latitude"], cand["longitude"],
+                esc["latitude"], esc["longitude"]
             )
             linha.append(round(dist, 6))
         matriz.append(linha)
@@ -169,10 +198,7 @@ def calcular_matriz_distancias(
 # ==============================================================================
 
 def gerar_capacidades_salas(capacidade_total: int, num_salas: int, cap_minima_sala: int = 10) -> List[int]:
-    """
-    Divide a capacidade total da escola entre as salas de forma estocástica e justa,
-    garantindo que o somatório das capacidades seja EXATAMENTE igual à capacidade total.
-    """
+    """Divide a capacidade total da escola entre as salas de forma estocástica e justa."""
     if capacidade_total < num_salas * cap_minima_sala:
         cap_minima_sala = max(1, capacidade_total // num_salas)
 
@@ -192,9 +218,11 @@ def gerar_escolas(
     max_cap: int,
     min_salas: int,
     max_salas: int,
-    ceps_disponiveis: List[str]
+    ceps_disponiveis: List[str],
+    cache: Dict[str, Dict[str, float]],
+    cache_file: str = CEP_CACHE_FILE
 ) -> List[Dict[str, Any]]:
-    """Gera a lista de escolas com suas características e salas."""
+    """Gera a lista de escolas com características, coordenadas e salas."""
     escolas = []
     ceps_sorteados = random.choices(ceps_disponiveis, k=num_escolas)
 
@@ -202,10 +230,14 @@ def gerar_escolas(
         cap_total = random.randint(min_cap, max_cap)
         num_salas = random.randint(min_salas, max_salas)
         capacidades_salas = gerar_capacidades_salas(cap_total, num_salas)
+        cep = ceps_sorteados[id_escola - 1]
+        coord = obter_geolocalizacao_cep(cep, cache, cache_file)
 
         escola = {
-            "id": id_escola,
-            "cep": ceps_sorteados[id_escola - 1],
+            "id": f"E{id_escola}",
+            "cep": cep,
+            "latitude": coord["latitude"],
+            "longitude": coord["longitude"],
             "capacidade_total": cap_total,
             "numero_salas": num_salas,
             "capacidade_salas": capacidades_salas
@@ -220,9 +252,11 @@ def gerar_candidatos(
     pct_jf: float,
     ceps_jf: List[str],
     ceps_outras: List[str],
-    tipos_prova: List[str]
+    tipos_prova: List[str],
+    cache: Dict[str, Dict[str, float]],
+    cache_file: str = CEP_CACHE_FILE
 ) -> List[Dict[str, Any]]:
-    """Gera a lista de candidatos com CEP e Tipo de Prova."""
+    """Gera a lista de candidatos com CEP, Tipo de Prova e Coordenadas."""
     candidatos = []
     num_jf = int(round(num_candidatos * pct_jf))
     num_outras = num_candidatos - num_jf
@@ -231,10 +265,14 @@ def gerar_candidatos(
     random.shuffle(ceps_candidatos)
 
     for id_cand in range(1, num_candidatos + 1):
+        cep = ceps_candidatos[id_cand - 1]
+        coord = obter_geolocalizacao_cep(cep, cache, cache_file)
         candidato = {
-            "id": id_cand,
-            "cep": ceps_candidatos[id_cand - 1],
-            "tipo_prova": random.choice(tipos_prova)
+            "id": f"C{id_cand}",
+            "cep": cep,
+            "tipo_prova": random.choice(tipos_prova),
+            "latitude": coord["latitude"],
+            "longitude": coord["longitude"]
         }
         candidatos.append(candidato)
 
@@ -256,21 +294,21 @@ def gerar_instancia(
     tipos_prova: List[str] = TIPOS_PROVA,
     cache_file: str = CEP_CACHE_FILE
 ) -> Dict[str, Any]:
-    """Cria uma instância completa contendo escolas, candidatos e a matriz de distâncias."""
+    """Cria uma instância completa contendo candidatos, escolas e a matriz de distâncias."""
     cache_cep = carregar_cache_cep(cache_file)
 
     num_escolas = random.randint(min_escolas, max_escolas)
-    escolas = gerar_escolas(num_escolas, min_cap, max_cap, min_salas, max_salas, ceps_escolas)
+    escolas = gerar_escolas(num_escolas, min_cap, max_cap, min_salas, max_salas, ceps_escolas, cache_cep, cache_file)
 
     capacidade_total_sistema = sum(e["capacidade_total"] for e in escolas)
 
     pct_candidatos = random.uniform(min_pct_cand, max_pct_cand)
     num_candidatos = int(round(capacidade_total_sistema * pct_candidatos))
 
-    candidatos = gerar_candidatos(num_candidatos, pct_cand_jf, ceps_escolas, ceps_outras_cidades, tipos_prova)
+    candidatos = gerar_candidatos(num_candidatos, pct_cand_jf, ceps_escolas, ceps_outras_cidades, tipos_prova, cache_cep, cache_file)
 
-    # Calcular Matriz de Distâncias
-    matriz_distancias = calcular_matriz_distancias(candidatos, escolas, cache_cep, cache_file)
+    # Calcular Matriz de Distâncias em graus
+    matriz_distancias = calcular_matriz_distancias(candidatos, escolas)
 
     instancia = {
         "resumo": {
@@ -294,33 +332,51 @@ def gerar_instancia(
 
 def salvar_txt(instancia: Dict[str, Any], filepath: str) -> None:
     """
-    Exporta a instância em formato TXT totalmente limpo (sem comentários #).
+    Exporta a instância seguindo estritamente a padronização oficial fornecida.
 
-    Estrutura:
-    <NUM_ESCOLAS>
-    <ID_ESCOLA> <CEP> <CAPACIDADE_TOTAL> <NUM_SALAS> <CAP_S1> <CAP_S2> ... <CAP_Sn>
-    ... (N linhas)
-    <NUM_CANDIDATOS>
-    <ID_CANDIDATO> <CEP> <TIPO_PROVA>
-    ... (M linhas)
-    <DISTANCIA_CAND_1_ESC_1> <DISTANCIA_CAND_1_ESC_2> ... <DISTANCIA_CAND_1_ESC_N>
-    ... (M linhas de distâncias)
+    Modelo:
+    NUM_CANDIDATOS: M
+    NUM_ESCOLAS: N
+
+    # CANDIDATOS (id, CEP, tipo_prova, latitude, longitude)
+    C1, 36037941, M3h, -21.779531, -43.376217
+    ...
+
+    # ESCOLAS (id, CEP, latitude, longitude, num_salas, capacidades_salas)
+    E1, 36100538, -21.756893, -43.289668, 2, 8;8
+    ...
+
+    # MATRIZ_DISTANCIAS (linhas=candidatos, colunas=escolas, em graus)
+    dist1, dist2, ..., distN
+    ...
     """
     with open(filepath, "w", encoding="utf-8") as f:
-        # 1. Número de escolas e linhas de escolas
-        f.write(f"{len(instancia['escolas'])}\n")
-        for e in instancia["escolas"]:
-            salas_str = " ".join(map(str, e["capacidade_salas"]))
-            f.write(f"{e['id']} {e['cep']} {e['capacidade_total']} {e['numero_salas']} {salas_str}\n")
+        candidatos = instancia["candidatos"]
+        escolas = instancia["escolas"]
+        matriz = instancia["matriz_distancias"]
 
-        # 2. Número de candidatos e linhas de candidatos
-        f.write(f"{len(instancia['candidatos'])}\n")
-        for c in instancia["candidatos"]:
-            f.write(f"{c['id']} {c['cep']} {c['tipo_prova']}\n")
+        # Cabeçalho de totais
+        f.write(f"NUM_CANDIDATOS: {len(candidatos)}\n")
+        f.write(f"NUM_ESCOLAS: {len(escolas)}\n\n")
 
-        # 3. Matriz de distâncias (M linhas por N colunas)
-        for linha_dist in instancia["matriz_distancias"]:
-            f.write(" ".join(map(str, linha_dist)) + "\n")
+        # Seção 1: CANDIDATOS
+        f.write("# CANDIDATOS (id, CEP, tipo_prova, latitude, longitude)\n")
+        for c in candidatos:
+            f.write(f"{c['id']}, {c['cep']}, {c['tipo_prova']}, {c['latitude']:.6f}, {c['longitude']:.6f}\n")
+        f.write("\n")
+
+        # Seção 2: ESCOLAS
+        f.write("# ESCOLAS (id, CEP, latitude, longitude, num_salas, capacidades_salas)\n")
+        for e in escolas:
+            salas_str = ";".join(map(str, e["capacidade_salas"]))
+            f.write(f"{e['id']}, {e['cep']}, {e['latitude']:.6f}, {e['longitude']:.6f}, {e['numero_salas']}, {salas_str}\n")
+        f.write("\n")
+
+        # Seção 3: MATRIZ DE DISTÂNCIAS (em graus)
+        f.write("# MATRIZ_DISTANCIAS (linhas=candidatos, colunas=escolas, em graus)\n")
+        for linha_dist in matriz:
+            linha_str = ", ".join(f"{d:.6f}" for d in linha_dist)
+            f.write(f"{linha_str}\n")
 
 
 def salvar_json(instancia: Dict[str, Any], filepath: str) -> None:

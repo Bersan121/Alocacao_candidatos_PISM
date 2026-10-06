@@ -2,7 +2,7 @@
 
 Este repositório contém o gerador de instâncias sintéticas para o problema **NP-difícil** de alocação e ensalamento de candidatos em locais de prova (baseado na estrutura do PISM/UFJF).
 
-O script `gerador_instancias.py` cria arquivos de instâncias formatados para leitura por máquinas e solvers de Pesquisa Operacional (em C, C++, Python, Julia, etc.), agora com suporte à **Matriz de Distâncias Geográficas (Candidatos x Escolas)** baseada em CEP.
+O script `gerador_instancias.py` cria arquivos de instâncias formatados estritamente conforme o modelo padronizado do projeto, contendo candidatos, escolas e a **Matriz de Distâncias Geográficas em Graus (Candidatos x Escolas)** baseada em CEP.
 
 ---
 
@@ -14,16 +14,18 @@ O script `gerador_instancias.py` cria arquivos de instâncias formatados para le
   - Número de salas por escola configurável (padrão: 5 a 15 salas).
   - Divisão da capacidade da escola entre as salas garantindo que $\sum \text{capacidades\_salas} = \text{capacidade\_total}$.
   - CEPs sorteados a partir da lista oficial de 20 CEPs de escolas de Juiz de Fora (apenas números, sem hífen).
+  - Identificadores prefixados: `E1`, `E2`, ..., `EN`.
 
 - **Candidatos**:
   - Quantidade total de candidatos ajustável proporcionalmente à capacidade acumulada de todas as escolas (padrão: 80% a 95% de ocupação).
   - CEPs com proporção geográfica configurável (padrão: 80% de Juiz de Fora e 20% de cidades da região/estado).
   - Tipos de prova sorteados entre: `M1`, `M2`, `M3e`, `M3s`, `M3h`, `M3d`.
+  - Identificadores prefixados: `C1`, `C2`, ..., `CM`.
 
-- **Matriz de Distâncias e Geolocalização (NOVO)**:
-  - Geolocalização dos CEPs obtida via API (**BrasilAPI v2**).
+- **Matriz de Distâncias e Geolocalização**:
+  - Geolocalização dos CEPs obtida via API (**BrasilAPI v2** com fallback para **ViaCEP + OpenStreetMap/Nominatim**).
   - **Cache Local (`cep_cache.json`)**: Cada CEP consultado é armazenado em disco para evitar requisições repetidas à API em novas execuções.
-  - **Distância Euclidiana**: Matriz $M \times N$ em que a linha $i$ contém a distância euclidiana das coordenadas (latitude, longitude) do candidato $i$ para todas as $N$ escolas.
+  - **Distância Euclidiana em Graus**: Matriz $M \times N$ em que a linha $i$ contém a distância euclidiana das coordenadas (latitude, longitude) do candidato $i$ para todas as $N$ escolas.
 
 ---
 
@@ -53,7 +55,7 @@ As principais faixas e taxas podem ser alteradas diretamente no início do arqui
 
 ### 1. Execução Padrão via Terminal
 
-Para gerar instâncias no formato `.txt` dentro da pasta `instancias/`:
+Para gerar instâncias no formato `.txt` padronizado dentro da pasta `instancias/`:
 
 ```bash
 python3 gerador_instancias.py --qtd 5 --outdir ./instancias --formato txt
@@ -76,11 +78,11 @@ python3 gerador_instancias.py --qtd 5 --outdir ./instancias --formato txt
 
 ```text
 .
-├── gerador_instancias.py    # Script principal do gerador
+├── gerador_instancias.py    # Script principal do gerador (modelo padronizado)
 ├── cep_cache.json           # Cache local de geolocalização dos CEPs (Latitude/Longitude)
 ├── README.md                # Instruções e documentação geral
 └── instancias/              # Pasta contendo os arquivos .txt gerados
-    ├── README.md            # Especificação detalhada do formato .txt para parsers
+    ├── README.md            # Especificação detalhada do formato .txt padronizado
     ├── instancia_1.txt
     └── ...
 ```

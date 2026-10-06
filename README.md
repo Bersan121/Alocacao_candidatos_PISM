@@ -2,7 +2,7 @@
 
 Este repositório contém o gerador de instâncias sintéticas para o problema **NP-difícil** de alocação e ensalamento de candidatos em locais de prova (baseado na estrutura do PISM/UFJF).
 
-O script `gerador_instancias.py` cria arquivos de instâncias formatados para leitura por máquinas e solvers de Pesquisa Operacional (em C, C++, Python, Julia, etc.).
+O script `gerador_instancias.py` cria arquivos de instâncias formatados para leitura por máquinas e solvers de Pesquisa Operacional (em C, C++, Python, Julia, etc.), agora com suporte à **Matriz de Distâncias Geográficas (Candidatos x Escolas)** baseada em CEP.
 
 ---
 
@@ -12,13 +12,18 @@ O script `gerador_instancias.py` cria arquivos de instâncias formatados para le
   - Número de escolas configurável (padrão: 10 a 20 escolas).
   - Capacidade total por escola configurável (padrão: 200 a 500 alunos).
   - Número de salas por escola configurável (padrão: 5 a 15 salas).
-  - Divisão da capacidade da escola entre as salas garantindo que a capacidade total da escola seja igual a soma da capacidade de cada sala.
+  - Divisão da capacidade da escola entre as salas garantindo que $\sum \text{capacidades\_salas} = \text{capacidade\_total}$.
   - CEPs sorteados a partir da lista oficial de 20 CEPs de escolas de Juiz de Fora (apenas números, sem hífen).
 
 - **Candidatos**:
   - Quantidade total de candidatos ajustável proporcionalmente à capacidade acumulada de todas as escolas (padrão: 80% a 95% de ocupação).
   - CEPs com proporção geográfica configurável (padrão: 80% de Juiz de Fora e 20% de cidades da região/estado).
   - Tipos de prova sorteados entre: `M1`, `M2`, `M3e`, `M3s`, `M3h`, `M3d`.
+
+- **Matriz de Distâncias e Geolocalização (NOVO)**:
+  - Geolocalização dos CEPs obtida via API (**BrasilAPI v2**).
+  - **Cache Local (`cep_cache.json`)**: Cada CEP consultado é armazenado em disco para evitar requisições repetidas à API em novas execuções.
+  - **Distância Euclidiana**: Matriz $M \times N$ em que a linha $i$ contém a distância euclidiana das coordenadas (latitude, longitude) do candidato $i$ para todas as $N$ escolas.
 
 ---
 
@@ -37,6 +42,7 @@ As principais faixas e taxas podem ser alteradas diretamente no início do arqui
 | `MIN_PCT_CANDIDATOS` | `float` | `0.80` | Taxa de ocupação mínima (80% da capacidade total) |
 | `MAX_PCT_CANDIDATOS` | `float` | `0.95` | Taxa de ocupação máxima (95% da capacidade total) |
 | `PCT_CANDIDATOS_JF` | `float` | `0.80` | Proporção de alunos com CEP em Juiz de Fora (80%) |
+| `CEP_CACHE_FILE` | `str` | `"cep_cache.json"` | Arquivo local de armazenamento de latitude/longitude |
 | `CEPS_ESCOLAS_JF` | `List[str]` | 20 CEPs | Lista de CEPs numéricos de escolas de JF |
 | `CEPS_OUTRAS_CIDADES` | `List[str]` | 11 CEPs | Lista de CEPs numéricos de outras cidades (Barbacena, Ubá, etc.) |
 | `TIPOS_PROVA` | `List[str]` | 6 tipos | Tipos de prova (`M1`, `M2`, `M3e`, `M3s`, `M3h`, `M3d`) |
@@ -62,16 +68,7 @@ python3 gerador_instancias.py --qtd 5 --outdir ./instancias --formato txt
 | `--prefixo` | Prefixo do nome dos arquivos (ex: `instancia_1.txt`) | `instancia` |
 | `--formato` | Formato de saída (`txt`, `json` ou `ambos`) | `txt` |
 | `--seed` | Semente aleatória para reprodutibilidade | `None` |
-
-### Exemplos:
-
-```bash
-# Gerar 10 instâncias em texto plano com semente fixa
-python3 gerador_instancias.py --qtd 10 --outdir ./instancias --formato txt --seed 12345
-
-# Gerar instâncias salvando tanto em .txt quanto em .json
-python3 gerador_instancias.py --qtd 3 --outdir ./instancias --formato ambos
-```
+| `--cache` | Caminho do arquivo JSON de cache de CEPs | `cep_cache.json` |
 
 ---
 
@@ -80,10 +77,10 @@ python3 gerador_instancias.py --qtd 3 --outdir ./instancias --formato ambos
 ```text
 .
 ├── gerador_instancias.py    # Script principal do gerador
+├── cep_cache.json           # Cache local de geolocalização dos CEPs (Latitude/Longitude)
 ├── README.md                # Instruções e documentação geral
 └── instancias/              # Pasta contendo os arquivos .txt gerados
     ├── README.md            # Especificação detalhada do formato .txt para parsers
     ├── instancia_1.txt
-    ├── instancia_2.txt
     └── ...
 ```

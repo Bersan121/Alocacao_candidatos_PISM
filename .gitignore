@@ -39,3 +39,13 @@ ENV/
 # Arquivos temporários e logs
 *.log
 *.tmp
+
+# LaTeX (relatorio/)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.toc
+*.synctex.gz

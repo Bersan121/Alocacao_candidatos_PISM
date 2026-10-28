@@ -1,4 +1,67 @@
-# Gerador de Instâncias - Alocação de Candidatos em Escolas (PISM)
+# Localização de Locais de Prova (PISM) — DCC136, Trabalho 1
+
+Heurística construtiva + busca local (VND) para o problema de localização de locais de prova, uma
+variante do *Single Source Capacitated Facility Location Problem*: cada candidato vai para uma
+escola, cada **sala** aplica um único tipo de prova (M1, M2, M3e, M3s, M3h, M3d) e o objetivo é
+minimizar a distância total. O relatório técnico (modelo SBC) está em `relatorio/relatorio.pdf`.
+
+## Como executar
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+
+# resumo das instâncias
+.venv/bin/python src/instancia.py instancias instancias_pism
+
+# experimento principal: construtivo + VND, 10 execuções por instância, RCL k = 10
+.venv/bin/python src/experimentos.py
+# uma instância, com o passo a passo (fase A, fase B e cada movimento do VND)
+.venv/bin/python src/experimentos.py -r 1 --traco -o resultados/exemplo instancias_pism/instancia1_G8.txt
+```
+
+Opções de `src/experimentos.py`: `-r` execuções (sementes 0..r-1), `-k` tamanho da RCL (`k = 1` é
+determinístico), `--limite S` limite de tempo do VND, `--sem-busca` só o construtivo, `--traco`
+passo a passo, `-o` pasta de saída. Saídas em `resultados/`:
+
+| Arquivo | Conteúdo |
+|---|---|
+| `execucoes.csv` | uma linha por execução: valor inicial e final, melhoria, tempos, escolas/salas usadas, movimentos e ganho de cada vizinhança |
+| `resumo.csv` | por instância: média, desvio, melhor e pior do valor inicial e final, melhoria e tempo médios |
+| `solucoes/<pasta>/<inst>.txt` | melhor solução: tipo e ocupação de cada sala e escola/sala de cada candidato |
+| `solucoes/<pasta>/<inst>_distribuicao.csv` | candidatos, capacidade e distância média por escola e tipo |
+| `traco/<pasta>/<inst>.txt` | passo a passo (com `--traco`) |
+
+As análises das instâncias (características, limite inferior e MIP) estão em `analise/` (ver
+`analise/README.md`). O relatório é gerado por:
+
+```bash
+.venv/bin/python relatorio/gerar_figuras.py     # figuras, tabelas e números citados no texto
+cd relatorio && latexmk -pdf relatorio.tex
+```
+
+## Estrutura
+
+```text
+.
+├── src/
+│   ├── instancia.py        # leitura das instâncias, lista sem repetidos, resumo
+│   ├── solucao.py          # representação (tipo de cada sala + escola de cada candidato), avaliação, verificação
+│   ├── construtivo.py      # fase A (tipo das salas) + fase B (arrependimento estático com RCL)
+│   ├── busca_local.py      # VND: shift, swap, cadeias de ejeção, retipar sala, trocar tipos
+│   └── experimentos.py     # roda tudo e grava resultados/
+├── analise/                # caracterização das instâncias e referências exatas
+├── resultados/             # saídas dos experimentos (principal, exemplo e sensibilidade a k)
+├── relatorio/              # relatório SBC (LaTeX), figuras e tabelas
+├── instancias/             # instâncias do grupo + especificação do formato
+├── instancias_pism/        # instâncias oficiais da turma (um par por grupo)
+├── gerador_instancias.py   # gerador de instâncias do grupo (abaixo)
+├── cep_cache.json          # cache de geolocalização dos CEPs
+└── trabalho.pdf            # enunciado
+```
+
+---
+
+## Gerador de instâncias
 
 Este repositório contém o gerador de instâncias sintéticas para o problema **NP-difícil** de alocação e ensalamento de candidatos em locais de prova (baseado na estrutura do PISM/UFJF).
 
@@ -6,7 +69,7 @@ O script `gerador_instancias.py` cria arquivos de instâncias formatados estrita
 
 ---
 
-## 📋 Recursos e Características das Instâncias
+### 📋 Recursos e Características das Instâncias
 
 - **Escolas**:
   - Número de escolas configurável (padrão: 10 a 20 escolas).
@@ -29,7 +92,7 @@ O script `gerador_instancias.py` cria arquivos de instâncias formatados estrita
 
 ---
 
-## ⚙️ Variáveis Globais de Configuração
+### ⚙️ Variáveis Globais de Configuração
 
 As principais faixas e taxas podem ser alteradas diretamente no início do arquivo `gerador_instancias.py`:
 
@@ -51,9 +114,9 @@ As principais faixas e taxas podem ser alteradas diretamente no início do arqui
 
 ---
 
-## 🚀 Como Executar
+### 🚀 Como Executar
 
-### 1. Execução Padrão via Terminal
+#### 1. Execução Padrão via Terminal
 
 Para gerar instâncias no formato `.txt` padronizado dentro da pasta `instancias/`:
 
@@ -61,7 +124,7 @@ Para gerar instâncias no formato `.txt` padronizado dentro da pasta `instancias
 python3 gerador_instancias.py --qtd 5 --outdir ./instancias --formato txt
 ```
 
-### 2. Parâmetros da Linha de Comando (CLI)
+#### 2. Parâmetros da Linha de Comando (CLI)
 
 | Parâmetro | Descrição | Padrão |
 |---|---|---|
@@ -71,18 +134,3 @@ python3 gerador_instancias.py --qtd 5 --outdir ./instancias --formato txt
 | `--formato` | Formato de saída (`txt`, `json` ou `ambos`) | `txt` |
 | `--seed` | Semente aleatória para reprodutibilidade | `None` |
 | `--cache` | Caminho do arquivo JSON de cache de CEPs | `cep_cache.json` |
-
----
-
-## 📁 Estrutura do Repositório
-
-```text
-.
-├── gerador_instancias.py    # Script principal do gerador (modelo padronizado)
-├── cep_cache.json           # Cache local de geolocalização dos CEPs (Latitude/Longitude)
-├── README.md                # Instruções e documentação geral
-└── instancias/              # Pasta contendo os arquivos .txt gerados
-    ├── README.md            # Especificação detalhada do formato .txt padronizado
-    ├── instancia_1.txt
-    └── ...
-```

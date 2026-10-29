@@ -6,9 +6,9 @@ Uso:
     Sem instâncias: usa instancias/ e instancias_pism/ (arquivos .txt, sem conteúdo repetido).
     -r, --execucoes R   execuções por instância, com sementes 0..R-1 (padrão 10; 1 se k = 1)
     -k K                tamanho da RCL da fase B (padrão 10; k = 1 é determinístico)
-    -t, --tipos-por-sala {1,2}
-                        máximo de tipos de prova por sala (padrão 1). Com 2, uma sala pode ser
-                        dividida entre dois tipos; a saída padrão passa a ser resultados/tipos2/
+    -t, --tipos-por-escola {1,2}
+                        máximo de tipos de prova por escola (padrão 1); cada sala tem sempre um
+                        único tipo. Com 2, a saída padrão passa a ser resultados/tipos2/
     --limite S          limite de tempo do VND em segundos (padrão: sem limite)
     --sem-busca         só o construtivo
     --traco             grava o passo a passo (fase A, fase B e cada movimento do VND) da
@@ -60,11 +60,12 @@ def executar(inst, nome, semente, k, busca, limite, traco, max_tipos=1):
         raise AssertionError("solução final inviável: " + "; ".join(erros[:5]))
     r = {
         "instancia": nome, "M": inst.M, "N": inst.N,
-        "salas": inst.num_salas, "execucao": semente, "k": k, "tipos_por_sala": max_tipos,
+        "salas": inst.num_salas, "execucao": semente, "k": k, "tipos_por_escola": max_tipos,
         "valor_inicial": inicial, "valor_final": sol.custo,
         "melhoria": inicial - sol.custo, "melhoria_pct": 100 * (inicial - sol.custo) / inicial if inicial else 0,
         "t_construtivo": t1 - t0, "t_busca": t2 - t1, "t_total": t2 - t0,
         "retipagens_faseA": info["retipagens"],
+        "reparo_faseA": info["reparo"],
         "escolas_usadas": sol.escolas_usadas(), "salas_usadas": sol.salas_usadas(),
         "dist_media": sol.custo / inst.M,
     }
@@ -82,7 +83,7 @@ def resumir(linhas):
     return {
         "instancia": linhas[0]["instancia"], "M": linhas[0]["M"], "N": linhas[0]["N"],
         "salas": linhas[0]["salas"], "execucoes": len(linhas),
-        "k": linhas[0]["k"], "tipos_por_sala": linhas[0]["tipos_por_sala"],
+        "k": linhas[0]["k"], "tipos_por_escola": linhas[0]["tipos_por_escola"],
         "inicial_media": st.mean(ini), "inicial_dp": dp(ini), "inicial_melhor": min(ini), "inicial_pior": max(ini),
         "final_media": st.mean(fin), "final_dp": dp(fin), "final_melhor": min(fin), "final_pior": max(fin),
         "melhoria_media_pct": st.mean(r["melhoria_pct"] for r in linhas),
@@ -109,7 +110,7 @@ def main():
     ap.add_argument("instancias", nargs="*")
     ap.add_argument("-r", "--execucoes", type=int, default=10)
     ap.add_argument("-k", type=int, default=10)
-    ap.add_argument("-t", "--tipos-por-sala", type=int, choices=(1, 2), default=1)
+    ap.add_argument("-t", "--tipos-por-escola", type=int, choices=(1, 2), default=1)
     ap.add_argument("--limite", type=float, default=None)
     ap.add_argument("--sem-busca", action="store_true")
     ap.add_argument("--traco", action="store_true")
@@ -118,7 +119,7 @@ def main():
     if a.k < 1:
         ap.error("k deve ser >= 1")
     reps = 1 if a.k == 1 else a.execucoes
-    saida = Path(a.saida or RAIZ / ("resultados" if a.tipos_por_sala == 1 else "resultados/tipos2"))
+    saida = Path(a.saida or RAIZ / ("resultados" if a.tipos_por_escola == 1 else "resultados/tipos2"))
     (saida / "solucoes").mkdir(parents=True, exist_ok=True)
     if a.traco:
         (saida / "traco").mkdir(exist_ok=True)
@@ -139,7 +140,7 @@ def main():
                     (saida / "traco" / nome).parent.mkdir(parents=True, exist_ok=True)
                     tr = open(saida / "traco" / f"{nome}.txt", "w")
                 try:
-                    r, sol = executar(inst, nome, sem, a.k, not a.sem_busca, a.limite, tr, a.tipos_por_sala)
+                    r, sol = executar(inst, nome, sem, a.k, not a.sem_busca, a.limite, tr, a.tipos_por_escola)
                 finally:
                     if tr:
                         tr.close()
@@ -157,7 +158,7 @@ def main():
         base.parent.mkdir(parents=True, exist_ok=True)
         sol.escrever(f"{base}.txt",
                      [f"instancia: {nome}", f"k: {a.k}  execucao (semente): {sem}  "
-                      f"tipos por sala: {a.tipos_por_sala}"])
+                      f"tipos por escola: {a.tipos_por_escola}"])
         with open(f"{base}_distribuicao.csv", "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(["escola", "tipo", "salas", "capacidade", "candidatos", "ocupacao_pct", "dist_media"])

@@ -1,4 +1,4 @@
-"""Busca local: VND com 5 vizinhanças (6 com até 2 tipos de prova por sala).
+"""Busca local: VND com 7 vizinhanças (um tipo de prova por sala, até max_tipos tipos por escola).
 
 Vizinhanças de alocação (as salas não mudam):
   N1 shift   : o candidato i vai para outra escola com vaga numa sala do seu tipo.
@@ -10,26 +10,27 @@ Vizinhanças de alocação (as salas não mudam):
                arco S->j com custo 0 e j->S com custo 0 se j tem vaga do tipo t. Um ciclo negativo
                (Bellman-Ford) é uma sequência de realocações que melhora f. Sem ciclo negativo, a
                alocação é ótima para as salas atuais (otimalidade do problema de transporte).
-Vizinhanças de salas:
-  N4 retipar : todas as vagas do tipo u na sala r da escola j passam para o tipo t (com um tipo
-               por sala: a sala muda de tipo).
-  N5 trocar  : duas salas da mesma escola, com um tipo cada, de tipos u != t e capacidades
-               s1 > s2, trocam de tipo (u perde s1 - s2 vagas na escola, t ganha s1 - s2): ajuste
-               fino da capacidade.
-  N6 dividir : (só com 2 tipos por sala) parte das vagas do tipo u na sala r passa para o tipo t,
-               que já está na sala ou vira o segundo tipo dela. Testa dois tamanhos L (entre 1 e
-               as vagas de u na sala - 1): as vagas que faltam para os candidatos de t que ganhariam
-               vindo para j, e as vagas de u ociosas na escola (sem despejos).
-  Os três são "transferir L vagas do tipo u para o tipo t na escola j". Avaliação do vizinho:
-    chegadas = até L candidatos do tipo t de outras escolas com maior ganho D[i,atual] - D[i,j] > 0;
-    despejos = se a carga de u passar da nova capacidade, sai o excedente, cada um para a escola
-               com vaga do tipo u mais próxima (guloso, menor aumento de custo primeiro);
+Vizinhanças de tipos (só geram vizinhos com até max_tipos tipos por escola):
+  N4 retipar : a sala r da escola j muda do tipo u para o tipo t (t já está na escola, ou r é a
+               única sala de u, ou a escola ainda pode receber mais um tipo).
+  N5 trocar  : duas salas da mesma escola, de tipos u != t e capacidades s1 > s2, trocam de tipo
+               (u perde s1 - s2 vagas na escola, t ganha s1 - s2): ajuste fino da capacidade.
+  N6 escola  : todas as salas do tipo u na escola j passam para o tipo t (a escola troca um dos
+               seus tipos; com um tipo por escola, é a mudança do tipo da escola).
+  N7 trocar escolas: as escolas j e k trocam um tipo: as salas de u em j passam para t e as de t
+               em k passam para u. A capacidade total de cada tipo quase não muda, o que permite
+               trocar tipos mesmo quando nenhum tipo tem sobra (comum com um tipo por escola).
+  Todos alteram a capacidade de algumas células (escola, tipo). Avaliação do vizinho:
+    chegadas = nas células que ganham vagas, os candidatos do tipo de outras escolas com maior
+               ganho D[i,atual] - D[i,j] > 0, até ocupar as vagas livres;
+    despejos = nas células que perdem vagas, sai o excedente, cada um para a escola com vaga do seu
+               tipo mais próxima (guloso, menor aumento de custo primeiro);
     delta    = custo dos despejos - ganho das chegadas. Aceita se delta < 0 (first improvement).
-  Todo movimento preserva a viabilidade: chegadas só ocupam vagas novas, despejos só vão para
+  Todo movimento preserva a viabilidade: chegadas só ocupam vagas livres, despejos só vão para
   escolas com vaga do seu tipo, e o movimento é descartado se não houver vagas para os despejos.
 
-Estratégia (VND): N1 -> N2 -> N3 -> N4 -> N5 (-> N6). N1, N2 e N3 são aplicadas até o ótimo local
-da vizinhança (todos os movimentos de melhora); N4, N5 e N6 aplicam o primeiro movimento de melhora.
+Estratégia (VND): N1 -> N2 -> ... -> N7. N1, N2 e N3 são aplicadas até o ótimo local da
+vizinhança (todos os movimentos de melhora); N4 a N7 aplicam o primeiro movimento de melhora.
 Sempre que uma vizinhança melhora a solução, volta para N1; termina quando nenhuma melhora.
 """
 import heapq
@@ -40,7 +41,8 @@ import numpy as np
 from instancia import NOMES_TIPOS, NUM_TIPOS as T
 
 EPS = 1e-9
-NOMES = ("N1_shift", "N2_swap", "N3_cadeias", "N4_retipar", "N5_trocar", "N6_dividir")
+NOMES = ("N1_shift", "N2_swap", "N3_cadeias", "N4_retipar", "N5_trocar", "N6_escola",
+         "N7_trocar_escolas")
 
 
 class BuscaLocal:
@@ -199,145 +201,166 @@ class BuscaLocal:
             if movs == antes:
                 return movs
 
-    # ------------------------------------------------------------------------- N4 / N5 / N6
-    def _transferir(self, j, u, t, L):
-        """Avalia transferir L vagas do tipo u para o tipo t na escola j.
-        Devolve (delta, despejos[(i, destino)], chegadas[i]) ou None se não melhora/inviável."""
+    # ------------------------------------------------------------------------- N4 a N7
+    def _avaliar(self, dcap):
+        """Avalia mudar a capacidade das células (escola, tipo) em dcap {(j, t): variação}.
+        Devolve (delta, [(i, destino)]) ou None se não melhora/inviável."""
         s, D = self.s, self.D
-        # chegadas: candidatos do tipo t de outras escolas que ganham indo para j
-        ids = self.ids_t[t]
-        fora = ids[s.aloc[ids] != j]
-        g = D[fora, s.aloc[fora]] - D[fora, j]
-        pos = np.flatnonzero(g > EPS)
-        vagas = s.cap[j, t] + L - s.carga[j, t]
-        if len(pos) == 0 or vagas <= 0:
+        vag = s.cap - s.carga
+        for (j, t), d in dcap.items():
+            vag[j, t] += d
+        dest, ganho = {}, 0.0
+        movido = np.zeros(self.inst.M, bool)
+        # chegadas: candidatos de outras escolas que ganham indo para as vagas novas
+        for (j, t), d in dcap.items():
+            if d <= 0 or vag[j, t] <= 0:
+                continue
+            ids = self.ids_t[t]
+            fora = ids[(s.aloc[ids] != j) & ~movido[ids]]
+            g = D[fora, s.aloc[fora]] - D[fora, j]
+            pos = np.flatnonzero(g > EPS)
+            for x in pos[np.argsort(-g[pos])[:vag[j, t]]]:
+                i = int(fora[x])
+                dest[i] = j
+                movido[i] = True
+                vag[s.aloc[i], t] += 1
+                vag[j, t] -= 1
+                ganho += g[x]
+        if ganho <= EPS:                             # sem chegadas com ganho, os despejos só pioram
             return None
-        top = pos[np.argsort(-g[pos])[:vagas]]
-        chegadas, ganho = fora[top], g[top].sum()
-        # despejos: excedente do tipo u na escola j
-        despejos, custo = [], 0.0
-        exc = s.carga[j, u] - (s.cap[j, u] - L)
-        if exc > 0:
-            vag = s.cap[:, u] - s.carga[:, u]
-            vag[j] = 0
-            if vag.sum() < exc:
+        # despejos: excedente nas células que perderam vagas
+        custo = 0.0
+        for (j, u), d in dcap.items():
+            exc = -vag[j, u]
+            if d >= 0 or exc <= 0:
+                continue
+            if vag[:, u].clip(0).sum() < exc:
                 return None
-            Iu = self.ids_t[u][s.aloc[self.ids_t[u]] == j]
+            ids = self.ids_t[u]
+            Iu = ids[(s.aloc[ids] == j) & ~movido[ids]]
 
             def melhor(i):
-                ok = np.flatnonzero(vag > 0)
+                ok = np.flatnonzero(vag[:, u] > 0)
                 k = ok[D[i, ok].argmin()]
-                return D[i, k] - D[i, j], k
+                return D[i, k] - D[i, j], int(k)
 
-            heap = []
-            for i in Iu:
-                c, k = melhor(i)
-                heap.append((c, int(i), int(k)))
+            heap = [(c, int(i), k) for i in Iu for c, k in [melhor(i)]]
             heapq.heapify(heap)
-            while len(despejos) < exc:
+            saiu = 0
+            while saiu < exc:
                 c, i, k = heapq.heappop(heap)
-                if vag[k] <= 0:                      # destino lotou: recalcula
+                if vag[k, u] <= 0:                   # destino lotou: recalcula
                     c, k = melhor(i)
-                    heapq.heappush(heap, (c, i, int(k)))
+                    heapq.heappush(heap, (c, i, k))
                     continue
-                vag[k] -= 1
+                vag[k, u] -= 1
+                vag[j, u] += 1
                 custo += c
-                despejos.append((i, k))
-                if custo >= ganho - EPS:
-                    return None
+                dest[i] = k
+                saiu += 1
         delta = custo - ganho
-        return (delta, despejos, chegadas) if delta < -EPS else None
+        return (delta, list(dest.items())) if delta < -EPS else None
 
-    def _aplicar_transferencia(self, j, u, t, L, despejos, chegadas):
-        s = self.s
-        s.cap[j, u] -= L
-        s.cap[j, t] += L
-        for i, k in despejos:
+    def _aplicar(self, dcap, movs):
+        for (j, t), d in dcap.items():
+            self.s.cap[j, t] += d
+        for i, k in movs:
             self.mover(i, k)
-        for i in chegadas:
-            self.mover(i, j)
 
     def _classes(self, j):
-        """Salas da escola j agrupadas por (capacidade, ((tipo, vagas), ...)): salas iguais geram o
-        mesmo vizinho."""
+        """Salas da escola j agrupadas por (capacidade, tipo): salas iguais geram o mesmo vizinho."""
         cl = {}
-        for r, cap in enumerate(self.inst.escolas[j].salas):
-            cl.setdefault((cap, tuple(sorted(self.s.assentos(j, r).items()))), r)
+        for r, (cap, u) in enumerate(zip(self.inst.escolas[j].salas, self.s.tipo_sala[j])):
+            cl.setdefault((cap, int(u)), r)
         return cl
 
     def n4_retipar(self):
         for j in range(self.inst.N):
-            for (cap, a), r in self._classes(j).items():
-                for u, su in a:
-                    for t in range(T):
-                        if t == u:
-                            continue
-                        res = self._transferir(j, u, t, su)
-                        if res:
-                            delta, desp, cheg = res
-                            self._log(f"  N4 {self._eid(j)} sala {r + 1} ({cap}) "
-                                      f"{NOMES_TIPOS[u]} -> {NOMES_TIPOS[t]}"
-                                      + (f" ({su} vagas)" if su != cap else "") + ": "
-                                      f"{len(cheg)} chegam, {len(desp)} saem, delta={delta:.4f}")
-                            self.s.mover_assentos(j, r, u, t, su)
-                            self._aplicar_transferencia(j, u, t, su, desp, cheg)
-                            return 1
+            tipos = self.s.tipos_escola(j)
+            for (cap, u), r in self._classes(j).items():
+                unica = (self.s.tipo_sala[j] == u).sum() == 1
+                for t in range(T):
+                    if t == u or len(tipos - ({u} if unica else set()) | {t}) > self.max_tipos:
+                        continue
+                    dcap = {(j, u): -cap, (j, t): cap}
+                    res = self._avaliar(dcap)
+                    if res:
+                        delta, movs = res
+                        self._log(f"  N4 {self._eid(j)} sala {r + 1} ({cap}) "
+                                  f"{NOMES_TIPOS[u]} -> {NOMES_TIPOS[t]}: {len(movs)} candidatos mudam, "
+                                  f"delta={delta:.4f}")
+                        self.s.tipo_sala[j][r] = t
+                        self._aplicar(dcap, movs)
+                        return 1
         return 0
 
     def n5_trocar(self):
         for j in range(self.inst.N):
-            cl = [((cap, a[0][0]), r) for (cap, a), r in self._classes(j).items() if len(a) == 1]
+            cl = list(self._classes(j).items())
             for (s1, u), r1 in cl:
                 for (s2, t), r2 in cl:
                     if u == t or s1 <= s2:
                         continue
-                    res = self._transferir(j, u, t, s1 - s2)
+                    dcap = {(j, u): s2 - s1, (j, t): s1 - s2}
+                    res = self._avaliar(dcap)
                     if res:
-                        delta, desp, cheg = res
+                        delta, movs = res
                         self._log(f"  N5 {self._eid(j)} sala {r1 + 1} ({s1}, {NOMES_TIPOS[u]}) <-> sala "
-                                  f"{r2 + 1} ({s2}, {NOMES_TIPOS[t]}): {len(cheg)} chegam, "
-                                  f"{len(desp)} saem, delta={delta:.4f}")
+                                  f"{r2 + 1} ({s2}, {NOMES_TIPOS[t]}): {len(movs)} candidatos mudam, "
+                                  f"delta={delta:.4f}")
                         self.s.tipo_sala[j][r1], self.s.tipo_sala[j][r2] = t, u
-                        self._aplicar_transferencia(j, u, t, s1 - s2, desp, cheg)
+                        self._aplicar(dcap, movs)
                         return 1
         return 0
 
-    def n6_dividir(self):
-        s, D = self.s, self.D
+    def n6_escola(self):
+        s = self.s
         for j in range(self.inst.N):
-            # candidatos de cada tipo, em outras escolas, que ganhariam vindo para j
-            interessados = np.zeros(T, int)
-            for t in range(T):
-                ids = self.ids_t[t]
-                fora = ids[s.aloc[ids] != j]
-                interessados[t] = int((D[fora, s.aloc[fora]] - D[fora, j] > EPS).sum())
-            for (cap, a), r in self._classes(j).items():
-                tipos = dict(a)
-                for u, su in a:
-                    for t in range(T):
-                        if t == u or (t not in tipos and len(tipos) >= self.max_tipos):
+            for u in sorted(s.tipos_escola(j)):
+                if (s.tipo_sala[j] == u).sum() == 1:     # uma sala só: é um movimento de N4
+                    continue
+                a = int(s.cap[j, u])
+                for t in range(T):
+                    if t == u:
+                        continue
+                    dcap = {(j, u): -a, (j, t): a}
+                    res = self._avaliar(dcap)
+                    if res:
+                        delta, movs = res
+                        self._log(f"  N6 {self._eid(j)} tipo {NOMES_TIPOS[u]} -> {NOMES_TIPOS[t]} ({a} vagas): "
+                                  f"{len(movs)} candidatos mudam, delta={delta:.4f}")
+                        s.tipo_sala[j][s.tipo_sala[j] == u] = t
+                        self._aplicar(dcap, movs)
+                        return 1
+        return 0
+
+    def n7_trocar_escolas(self):
+        s, N = self.s, self.inst.N
+        for j in range(N):
+            for k in range(j + 1, N):
+                for u in sorted(s.tipos_escola(j)):
+                    for t in sorted(s.tipos_escola(k)):
+                        if u == t:
                             continue
-                        falta = interessados[t] - (s.cap[j, t] - s.carga[j, t])
-                        folga = s.cap[j, u] - s.carga[j, u]
-                        for L in sorted({int(min(falta, su)), int(min(folga, su))}):
-                            if not 0 < L < su:
-                                continue
-                            res = self._transferir(j, u, t, L)
-                            if res:
-                                delta, desp, cheg = res
-                                self._log(f"  N6 {self._eid(j)} sala {r + 1} ({cap}) {L} vagas "
-                                          f"{NOMES_TIPOS[u]} -> {NOMES_TIPOS[t]}: {len(cheg)} chegam, "
-                                          f"{len(desp)} saem, delta={delta:.4f}")
-                                s.mover_assentos(j, r, u, t, L)
-                                self._aplicar_transferencia(j, u, t, L, desp, cheg)
-                                return 1
+                        a, b = int(s.cap[j, u]), int(s.cap[k, t])
+                        dcap = {(j, u): -a, (j, t): a, (k, t): -b, (k, u): b}
+                        res = self._avaliar(dcap)
+                        if res:
+                            delta, movs = res
+                            self._log(f"  N7 {self._eid(j)} {NOMES_TIPOS[u]}->{NOMES_TIPOS[t]} ({a} vagas) e "
+                                      f"{self._eid(k)} {NOMES_TIPOS[t]}->{NOMES_TIPOS[u]} ({b} vagas): "
+                                      f"{len(movs)} candidatos mudam, delta={delta:.4f}")
+                            rj, rk = s.tipo_sala[j] == u, s.tipo_sala[k] == t
+                            s.tipo_sala[j][rj] = t
+                            s.tipo_sala[k][rk] = u
+                            self._aplicar(dcap, movs)
+                            return 1
         return 0
 
     # ------------------------------------------------------------------------- VND
     def vnd(self, limite_s=None):
-        viz = [self.n1_shift, self.n2_swap, self.n3_cadeias, self.n4_retipar, self.n5_trocar]
-        if self.max_tipos > 1:
-            viz.append(self.n6_dividir)
+        viz = [self.n1_shift, self.n2_swap, self.n3_cadeias, self.n4_retipar, self.n5_trocar,
+               self.n6_escola, self.n7_trocar_escolas]
         t0 = time.perf_counter()
         self._log(f"== VND (inicial {self.s.custo:.4f})")
         k = 0

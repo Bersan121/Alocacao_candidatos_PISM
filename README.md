@@ -3,7 +3,8 @@
 Heurística construtiva + busca local (VND) para o problema de localização de locais de prova, uma
 variante do *Single Source Capacitated Facility Location Problem*: cada candidato vai para uma
 escola, cada **sala** aplica um único tipo de prova (M1, M2, M3e, M3s, M3h, M3d) e o objetivo é
-minimizar a distância total. O relatório técnico (modelo SBC) está em `relatorio/relatorio.pdf`.
+minimizar a distância total. Uma variante opcional permite dividir cada sala entre **até dois tipos**
+(`--tipos-por-sala 2`). O relatório técnico (modelo SBC) está em `relatorio/relatorio.pdf`.
 
 ## Como executar
 
@@ -13,21 +14,25 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # resumo das instâncias
 .venv/bin/python src/instancia.py instancias instancias_pism
 
-# experimento principal: construtivo + VND, 10 execuções por instância, RCL k = 10
+# experimento principal: construtivo + VND, 10 execuções por instância, RCL k = 10, 1 tipo por sala
 .venv/bin/python src/experimentos.py
+# o mesmo com até 2 tipos de prova por sala (grava em resultados/tipos2/)
+.venv/bin/python src/experimentos.py -t 2
 # uma instância, com o passo a passo (fase A, fase B e cada movimento do VND)
 .venv/bin/python src/experimentos.py -r 1 --traco -o resultados/exemplo instancias_pism/instancia1_G8.txt
+.venv/bin/python src/experimentos.py -t 2 -r 1 --traco -o resultados/tipos2/exemplo instancias_pism/instancia1_G8.txt
 ```
 
 Opções de `src/experimentos.py`: `-r` execuções (sementes 0..r-1), `-k` tamanho da RCL (`k = 1` é
-determinístico), `--limite S` limite de tempo do VND, `--sem-busca` só o construtivo, `--traco`
-passo a passo, `-o` pasta de saída. Saídas em `resultados/`:
+determinístico), `-t`/`--tipos-por-sala` máximo de tipos de prova por sala (1 ou 2; padrão 1),
+`--limite S` limite de tempo do VND, `--sem-busca` só o construtivo, `--traco` passo a passo, `-o`
+pasta de saída. Saídas em `resultados/` (ou `resultados/tipos2/` com `-t 2`):
 
 | Arquivo | Conteúdo |
 |---|---|
 | `execucoes.csv` | uma linha por execução: valor inicial e final, melhoria, tempos, escolas/salas usadas, movimentos e ganho de cada vizinhança |
 | `resumo.csv` | por instância: média, desvio, melhor e pior do valor inicial e final, melhoria e tempo médios |
-| `solucoes/<pasta>/<inst>.txt` | melhor solução: tipo e ocupação de cada sala e escola/sala de cada candidato |
+| `solucoes/<pasta>/<inst>.txt` | melhor solução: tipo e ocupação de cada sala (sala dividida: `M1:12+M3d:4`) e escola/sala de cada candidato |
 | `solucoes/<pasta>/<inst>_distribuicao.csv` | candidatos, capacidade e distância média por escola e tipo |
 | `traco/<pasta>/<inst>.txt` | passo a passo (com `--traco`) |
 
@@ -35,9 +40,11 @@ As análises das instâncias (características, limite inferior e MIP) estão em
 `analise/README.md`). O relatório é gerado por:
 
 ```bash
-.venv/bin/python relatorio/gerar_figuras.py     # figuras, tabelas e números citados no texto
+.venv/bin/python relatorio/gerar_figuras.py     # figuras (PNG), tabelas e números citados no texto
 cd relatorio && latexmk -pdf relatorio.tex
 ```
+
+As figuras do relatório são sempre imagens PNG (300 dpi) em `relatorio/figuras/`, nunca PDF.
 
 ## Estrutura
 
@@ -47,11 +54,11 @@ cd relatorio && latexmk -pdf relatorio.tex
 │   ├── instancia.py        # leitura das instâncias, lista sem repetidos, resumo
 │   ├── solucao.py          # representação (tipo de cada sala + escola de cada candidato), avaliação, verificação
 │   ├── construtivo.py      # fase A (tipo das salas) + fase B (arrependimento estático com RCL)
-│   ├── busca_local.py      # VND: shift, swap, cadeias de ejeção, retipar sala, trocar tipos
+│   ├── busca_local.py      # VND: shift, swap, cadeias de ejeção, retipar sala, trocar tipos, dividir sala
 │   └── experimentos.py     # roda tudo e grava resultados/
 ├── analise/                # caracterização das instâncias e referências exatas
-├── resultados/             # saídas dos experimentos (principal, exemplo e sensibilidade a k)
-├── relatorio/              # relatório SBC (LaTeX), figuras e tabelas
+├── resultados/             # saídas dos experimentos (principal, exemplo, sensibilidade a k e tipos2/)
+├── relatorio/              # relatório SBC (LaTeX), figuras (PNG) e tabelas
 ├── instancias/             # instâncias do grupo + especificação do formato
 ├── instancias_pism/        # instâncias oficiais da turma (um par por grupo)
 ├── gerador_instancias.py   # gerador de instâncias do grupo (abaixo)

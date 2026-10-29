@@ -82,6 +82,12 @@ trabalho.pdf            # enunciado
 Justificativa e comparação com "um tipo por escola" no relatório (Seções 2.2 e 8.7). Não há
 penalização: todas as soluções geradas são viáveis.
 
+Variante opcional `--tipos-por-sala 2` (`-t 2`): uma sala pode ser dividida entre **até dois tipos**
+(parte das vagas para cada um). Com `-t 1` (padrão) o código se comporta exatamente como antes
+(mesmos valores, soluções e traços). Com `-t 2` todas as 28 instâncias são viáveis (inclusive
+`Instancia1_G2`). O experimento principal do relatório usa `-t 1` (`resultados/`); a Seção
+"Até dois tipos por sala" compara com `-t 2` (`resultados/tipos2/`).
+
 ## Código (Python 3)
 
 Ambiente: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`. O scipy traz o
@@ -93,33 +99,44 @@ solver HiGHS, usado só nas análises.
   `listar_instancias()` lista `instancias/` + `instancias_pism/` sem repetidos e `rotulo(arq)` dá o
   nome usado em todos os resultados (caminho relativo sem `.txt`, ex.: `instancias_pism/Instancia1_G1`).
   Resumo: `.venv/bin/python src/instancia.py instancias instancias_pism`.
-- `src/solucao.py`: `Solucao(inst, tipo_sala, aloc)` mantém `cap[j,t]`, `carga[j,t]` e `custo`.
+- `src/solucao.py`: `Solucao(inst, st, aloc, max_tipos)` mantém `cap[j,t]`, `carga[j,t]` e `custo`.
+  `st = (tipo_sala, tipo2, vagas2)`: tipo principal, segundo tipo (-1 = nenhum) e vagas do segundo
+  tipo em cada sala; `assentos(j, r)` dá `{tipo: vagas}` e `mover_assentos(j, r, u, t, L)` passa
+  vagas de um tipo para outro.
   `verificar()` checa todas as restrições do zero; `distribuir_salas()` põe os candidatos nas salas.
-- `src/construtivo.py`: `construir(inst, k, rng, traco)`. Fase A: tipo das salas (demanda estimada,
+- `src/construtivo.py`: `construir(inst, k, rng, traco, max_tipos)`; `fase_a` devolve `(st, retipagens)`. Fase A: tipo das salas (demanda estimada,
   best-fit, sobras, cobertura; lança `ErroConstrucao` se a instância é inviável). Fase B: fila por
   arrependimento estático, RCL dos k primeiros, aloca na escola mais próxima com sala do tipo e vaga.
 - `src/busca_local.py`: `BuscaLocal(sol).vnd()`. N1 shift, N2 swap, N3 cadeias de ejeção (ciclo
-  negativo), N4 retipar sala, N5 trocar tipos de duas salas; volta para N1 sempre que melhora.
-- `src/experimentos.py [-r 10] [-k 10] [--traco] [--sem-busca] [--limite S] [-o resultados] [instancias...]`:
+  negativo), N4 retipar sala, N5 trocar tipos de duas salas e, só com 2 tipos por sala, N6 dividir
+  sala (passa parte das vagas para outro tipo); volta para N1 sempre que melhora.
+- `src/experimentos.py [-r 10] [-k 10] [-t 1|2] [--traco] [--sem-busca] [--limite S] [-o resultados] [instancias...]`:
   grava `execucoes.csv`, `resumo.csv`, `solucoes/<pasta>/<inst>.txt` e `_distribuicao.csv` e, com
-  `--traco`, `traco/<pasta>/<inst>.txt`.
+  `--traco`, `traco/<pasta>/<inst>.txt`. Com `-t 2` a saída padrão é `resultados/tipos2/`.
 
 ## Reproduzir tudo
 
 ```
 .venv/bin/python src/experimentos.py                                     # resultados/ (~15 min)
+.venv/bin/python src/experimentos.py -t 2                                # resultados/tipos2/ (~15 min)
 .venv/bin/python src/experimentos.py -r 1 --traco -o resultados/exemplo instancias_pism/instancia1_G8.txt
+.venv/bin/python src/experimentos.py -t 2 -r 1 --traco -o resultados/tipos2/exemplo instancias_pism/instancia1_G8.txt
 for K in 1 5 25 50; do .venv/bin/python src/experimentos.py -k $K -o resultados/sensibilidade_k/k$K; done
 .venv/bin/python analise/caracteristicas.py                              # analise/resultados/
 .venv/bin/python analise/modelo_sala.py 60                               # MIP de 60 s por instância
 .venv/bin/python analise/modelo_escola.py 60
-.venv/bin/python relatorio/gerar_figuras.py                              # figuras, tabelas e métricas
+.venv/bin/python relatorio/gerar_figuras.py                              # figuras PNG, tabelas e métricas
 cd relatorio && latexmk -pdf relatorio.tex
 ```
 
 ## Relatório
 
 - `relatorio/relatorio.tex` usa o modelo oficial da SBC (`sbc-template.sty`, `sbc.bst`).
+- **Figuras sempre como imagens PNG** (300 dpi, função `salvar` em `gerar_figuras.py`), nunca PDF;
+  o script apaga PDFs antigos de `relatorio/figuras/`.
+- `gerar_figuras.py` lê `resultados/` (1 tipo por sala) e `resultados/tipos2/` (até 2 tipos). O LB
+  de `modelo_sala.csv` também vale para 2 tipos; para `Instancia1_G2` (sem LB no CSV, inviável com
+  1 tipo) o script calcula a mesma relaxação.
 - Todos os números do texto vêm de macros em `relatorio/tabelas/metricas.tex`, geradas por
   `gerar_figuras.py` (não editar à mão). As instâncias citadas ficam no dicionário `CITADAS`.
   Ao mudar resultados, rode o script e confira as frases do texto que interpretam os números.

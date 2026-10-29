@@ -80,7 +80,7 @@ def mip(inst, limite):
 
 def aloc_otima_construtivo(inst):
     try:
-        tipo_sala, _ = fase_a(inst)
+        (tipo_sala, _, _), _ = fase_a(inst)
     except ErroConstrucao:
         return None
     capjt = np.zeros((inst.N, T), int)

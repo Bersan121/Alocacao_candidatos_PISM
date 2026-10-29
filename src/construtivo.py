@@ -1,15 +1,21 @@
-"""Heurística construtiva (um tipo de prova por sala).
+"""Heurística construtiva (até `max_tipos` tipos de prova por sala, 1 ou 2).
 
-Fase A: tipo de cada sala (determinística).
+Fase A: tipo(s) de cada sala (determinística).
   A1. Alocação provisória por arrependimento usando só a capacidade da escola (ignora o tipo das
       salas): estima quantos candidatos de cada tipo "querem" cada escola, d[j, t].
   A2. Em cada escola, enquanto algum tipo tem falta (d[j, t] - capacidade já dada a t), o tipo de
       maior falta recebe a menor sala que cobre a falta (best-fit); se nenhuma cobre, a maior.
+      Com 2 tipos por sala, as vagas que sobram na sala (capacidade - falta) vão para o tipo com a
+      segunda maior falta, até cobri-la; o resto fica com o primeiro tipo.
   A3. Salas que sobraram recebem o tipo com maior déficit global (capacidade < demanda); sem
       déficit, o tipo com maior falta local. Abrir uma sala nunca piora a solução.
   A4. Cobertura: enquanto algum tipo t tem capacidade total < demanda, uma sala de um tipo u cuja
       sobra (capacidade - demanda de u) é >= capacidade da sala passa para t; entre as candidatas,
       a da escola onde t tem mais falta local (empate: a menor sala).
+      Com 2 tipos por sala, a sala não precisa mudar inteira: passam para t
+      L = min(déficit de t, sobra de u, vagas de u na sala) vagas, desde que a sala continue com
+      no máximo 2 tipos; entre as candidatas, a escola onde t tem mais falta local (empate: maior L,
+      depois a menor sala).
       É o que impede a fase B de travar: ao final, capacidade do tipo t >= demanda do tipo t.
       Se nenhuma sala pode mudar de tipo, lança ErroConstrucao (a instância é inviável; ver
       analise/modelo_sala.py, que confirma com um modelo exato).
@@ -22,7 +28,7 @@ Fase B: alocação dos candidatos (lista restrita de candidatos, RCL de tamanho 
       vez.
   B3. RCL: os k primeiros candidatos ainda não alocados da fila.
   B4. Sorteia um candidato da RCL; percorre o vetor de proximidade dele e o aloca na primeira
-      escola que tem uma sala do seu tipo com vaga (salas maiores primeiro).
+      escola que tem uma sala do seu tipo com vaga (salas com mais vagas do tipo primeiro).
   B5. A vaga é descontada da sala, o candidato sai da RCL e o próximo da fila entra.
   Com k = 1 a construção é determinística. Nunca trava: pela fase A, a capacidade de cada tipo
   cobre sua demanda, e o vetor de proximidade contém todas as escolas.
@@ -32,7 +38,7 @@ import time
 import numpy as np
 
 from instancia import NOMES_TIPOS, NUM_TIPOS as T
-from solucao import Solucao
+from solucao import Solucao, assentos, mover_assentos, salas_vazias
 
 
 class ErroConstrucao(Exception):
@@ -44,10 +50,11 @@ def _log(traco, msg):
         traco.write(msg + "\n")
 
 
-def fase_a(inst, traco=None):
-    """Tipo de cada sala. Devolve (tipo_sala, retipagens da etapa A4)."""
+def fase_a(inst, traco=None, max_tipos=1):
+    """Tipo(s) de cada sala. Devolve (st, retipagens da etapa A4), st = (tipo_sala, tipo2, vagas2)."""
     D, N, tc = inst.D, inst.N, inst.tipo_cand
-    tipo_sala = [np.full(len(e.salas), -1, dtype=int) for e in inst.escolas]
+    st = salas_vazias(inst)
+    tipo_sala, tipo2, vagas2 = st
     capjt = np.zeros((N, T), int)        # capacidade já dada a cada (escola, tipo)
     dem = inst.demanda()
     _log(traco, "== FASE A: tipo de cada sala")
@@ -78,8 +85,19 @@ def fase_a(inst, traco=None):
             r = cabe[0] if cabe else salas[-1]
             salas.remove(r)
             tipo_sala[j][r] = t
-            capjt[j, t] += e.salas[r]
-            _log(traco, f"    {e.id} sala {r + 1} ({e.salas[r]}) -> {NOMES_TIPOS[t]} (falta {falta[t]})")
+            v2 = 0
+            if max_tipos > 1 and e.salas[r] > falta[t]:
+                outra = falta.copy()
+                outra[t] = 0
+                t2 = int(outra.argmax())
+                if outra[t2] > 0:
+                    v2 = int(min(e.salas[r] - falta[t], outra[t2]))
+                    tipo2[j][r], vagas2[j][r] = t2, v2
+                    capjt[j, t2] += v2
+            capjt[j, t] += e.salas[r] - v2
+            _log(traco, f"    {e.id} sala {r + 1} ({e.salas[r]}) -> {NOMES_TIPOS[t]} (falta {falta[t]})"
+                        + (f" + {v2} vagas para {NOMES_TIPOS[tipo2[j][r]]} (falta {falta[tipo2[j][r]]})"
+                           if v2 else ""))
     # A3. salas que sobraram
     for j, e in enumerate(inst.escolas):
         for r in sorted(np.flatnonzero(tipo_sala[j] < 0), key=lambda r: -e.salas[r]):
@@ -97,29 +115,41 @@ def fase_a(inst, traco=None):
             break
         melhor = None
         for j in range(N):
-            for r, u in enumerate(tipo_sala[j]):
-                s = inst.escolas[j].salas[r]
-                if u != t and -deficit[u] >= s:
-                    chave = (-(d_esc[j, t] - capjt[j, t]), s)
+            falta_t = d_esc[j, t] - capjt[j, t]
+            for r, s in enumerate(inst.escolas[j].salas):
+                a = assentos(inst, st, j, r)
+                for u, su in a.items():
+                    if u == t:
+                        continue
+                    if max_tipos == 1:             # a sala inteira muda de tipo
+                        if -deficit[u] < s:
+                            continue
+                        L, chave = s, (-falta_t, s)
+                    else:                          # só parte da sala muda de tipo
+                        L = int(min(deficit[t], -deficit[u], su))
+                        if L <= 0 or (L < su and t not in a and len(a) >= max_tipos):
+                            continue
+                        chave = (-falta_t, -L, s)
                     if melhor is None or chave < melhor[0]:
-                        melhor = (chave, j, r)
+                        melhor = (chave, j, r, u, L)
         if melhor is None:
             raise ErroConstrucao(f"não há como cobrir a demanda do tipo {NOMES_TIPOS[t]} "
                                  f"(falta {deficit[t]} vagas)")
-        _, j, r = melhor
-        u, s = tipo_sala[j][r], inst.escolas[j].salas[r]
-        tipo_sala[j][r] = t
-        capjt[j, u] -= s
-        capjt[j, t] += s
+        _, j, r, u, L = melhor
+        mover_assentos(inst, st, j, r, u, t, L)
+        capjt[j, u] -= L
+        capjt[j, t] += L
         retip += 1
+        s = inst.escolas[j].salas[r]
         _log(traco, f"A4. {NOMES_TIPOS[t]} sem cobertura (falta {deficit[t]}): {inst.escolas[j].id} sala "
-                    f"{r + 1} ({s}) {NOMES_TIPOS[u]} -> {NOMES_TIPOS[t]}")
+                    f"{r + 1} ({s}) " + (f"{NOMES_TIPOS[u]} -> {NOMES_TIPOS[t]}" if L == s else
+                                         f"passa {L} vagas de {NOMES_TIPOS[u]} para {NOMES_TIPOS[t]}"))
     _log(traco, "capacidade por tipo: " + " ".join(
         f"{NOMES_TIPOS[t]}={capjt[:, t].sum()}/{dem[t]}" for t in range(T)))
-    return tipo_sala, retip
+    return st, retip
 
 
-def fase_b(inst, tipo_sala, k=1, rng=None, traco=None):
+def fase_b(inst, st, k=1, rng=None, traco=None):
     """Alocação por arrependimento estático com RCL de tamanho k. Devolve (aloc, sala)."""
     D, M, N, tc = inst.D, inst.M, inst.N, inst.tipo_cand
     # B1. vetor de proximidade de cada candidato
@@ -128,16 +158,18 @@ def fase_b(inst, tipo_sala, k=1, rng=None, traco=None):
     d12 = np.take_along_axis(D, pref[:, :2], 1) if N > 1 else np.zeros((M, 2))
     reg = d12[:, 1] - d12[:, 0]
     fila = np.argsort(-reg, kind="stable")
-    # vagas por sala; salas de cada (escola, tipo), maiores primeiro
-    vaga = [np.array(e.salas) for e in inst.escolas]
+    # vagas de cada tipo em cada sala; salas de cada (escola, tipo), com mais vagas primeiro
+    vaga = {}                                   # (j, r, t) -> vagas livres
     salas_jt = {}
     vaga_jt = np.zeros((N, T), int)
     for j, e in enumerate(inst.escolas):
-        for r in sorted(range(len(e.salas)), key=lambda r: -e.salas[r]):
-            t = tipo_sala[j][r]
-            if t >= 0:
+        for r in range(len(e.salas)):
+            for t, n in assentos(inst, st, j, r).items():
+                vaga[j, r, t] = n
                 salas_jt.setdefault((j, t), []).append(r)
-                vaga_jt[j, t] += e.salas[r]
+                vaga_jt[j, t] += n
+    for (j, t), rs in salas_jt.items():
+        rs.sort(key=lambda r: -vaga[j, r, t])
     aloc = np.full(M, -1)
     sala = np.full(M, -1)
     rcl = list(fila[:k])
@@ -159,8 +191,8 @@ def fase_b(inst, tipo_sala, k=1, rng=None, traco=None):
                 pulos.append(f"{inst.escolas[j].id}:{'lotada' if (j, t) in salas_jt else 'sem sala'}")
         else:
             raise ErroConstrucao(f"candidato {inst.candidatos[i].id} sem sala do tipo {NOMES_TIPOS[t]}")
-        r = next(r for r in salas_jt[j, t] if vaga[j][r] > 0)
-        vaga[j][r] -= 1
+        r = next(r for r in salas_jt[j, t] if vaga[j, r, t] > 0)
+        vaga[j, r, t] -= 1
         vaga_jt[j, t] -= 1
         aloc[i], sala[i] = j, r
         if prox < M:
@@ -173,13 +205,13 @@ def fase_b(inst, tipo_sala, k=1, rng=None, traco=None):
     return aloc, sala
 
 
-def construir(inst, k=1, rng=None, traco=None):
-    """Solução inicial viável. Devolve (Solucao, info)."""
+def construir(inst, k=1, rng=None, traco=None, max_tipos=1):
+    """Solução inicial viável com até max_tipos tipos de prova por sala. Devolve (Solucao, info)."""
     t0 = time.perf_counter()
-    tipo_sala, retip = fase_a(inst, traco)
+    st, retip = fase_a(inst, traco, max_tipos)
     t1 = time.perf_counter()
-    aloc, _ = fase_b(inst, tipo_sala, k, rng, traco)
+    aloc, _ = fase_b(inst, st, k, rng, traco)
     t2 = time.perf_counter()
-    sol = Solucao(inst, tipo_sala, aloc)
+    sol = Solucao(inst, st, aloc, max_tipos)
     _log(traco, f"solução inicial: custo {sol.custo:.4f}")
     return sol, {"t_fase_a": t1 - t0, "t_fase_b": t2 - t1, "retipagens": retip}

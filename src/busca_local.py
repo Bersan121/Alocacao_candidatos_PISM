@@ -1,4 +1,4 @@
-"""Busca local: VND com 5 vizinhanças (um tipo de prova por sala).
+"""Busca local: VND com 5 vizinhanças (6 com até 2 tipos de prova por sala).
 
 Vizinhanças de alocação (as salas não mudam):
   N1 shift   : o candidato i vai para outra escola com vaga numa sala do seu tipo.
@@ -11,10 +11,16 @@ Vizinhanças de alocação (as salas não mudam):
                (Bellman-Ford) é uma sequência de realocações que melhora f. Sem ciclo negativo, a
                alocação é ótima para as salas atuais (otimalidade do problema de transporte).
 Vizinhanças de salas:
-  N4 retipar : a sala r da escola j muda do tipo u para o tipo t.
-  N5 trocar  : duas salas da mesma escola, de tipos u != t e capacidades s1 > s2, trocam de tipo
-               (u perde s1 - s2 vagas na escola, t ganha s1 - s2): ajuste fino da capacidade.
-  Os dois são "transferir L vagas do tipo u para o tipo t na escola j". Avaliação do vizinho:
+  N4 retipar : todas as vagas do tipo u na sala r da escola j passam para o tipo t (com um tipo
+               por sala: a sala muda de tipo).
+  N5 trocar  : duas salas da mesma escola, com um tipo cada, de tipos u != t e capacidades
+               s1 > s2, trocam de tipo (u perde s1 - s2 vagas na escola, t ganha s1 - s2): ajuste
+               fino da capacidade.
+  N6 dividir : (só com 2 tipos por sala) parte das vagas do tipo u na sala r passa para o tipo t,
+               que já está na sala ou vira o segundo tipo dela. Testa dois tamanhos L (entre 1 e
+               as vagas de u na sala - 1): as vagas que faltam para os candidatos de t que ganhariam
+               vindo para j, e as vagas de u ociosas na escola (sem despejos).
+  Os três são "transferir L vagas do tipo u para o tipo t na escola j". Avaliação do vizinho:
     chegadas = até L candidatos do tipo t de outras escolas com maior ganho D[i,atual] - D[i,j] > 0;
     despejos = se a carga de u passar da nova capacidade, sai o excedente, cada um para a escola
                com vaga do tipo u mais próxima (guloso, menor aumento de custo primeiro);
@@ -22,8 +28,8 @@ Vizinhanças de salas:
   Todo movimento preserva a viabilidade: chegadas só ocupam vagas novas, despejos só vão para
   escolas com vaga do seu tipo, e o movimento é descartado se não houver vagas para os despejos.
 
-Estratégia (VND): N1 -> N2 -> N3 -> N4 -> N5. N1, N2 e N3 são aplicadas até o ótimo local da
-vizinhança (todos os movimentos de melhora); N4 e N5 aplicam o primeiro movimento de melhora.
+Estratégia (VND): N1 -> N2 -> N3 -> N4 -> N5 (-> N6). N1, N2 e N3 são aplicadas até o ótimo local
+da vizinhança (todos os movimentos de melhora); N4, N5 e N6 aplicam o primeiro movimento de melhora.
 Sempre que uma vizinhança melhora a solução, volta para N1; termina quando nenhuma melhora.
 """
 import heapq
@@ -34,13 +40,14 @@ import numpy as np
 from instancia import NOMES_TIPOS, NUM_TIPOS as T
 
 EPS = 1e-9
-NOMES = ("N1_shift", "N2_swap", "N3_cadeias", "N4_retipar", "N5_trocar")
+NOMES = ("N1_shift", "N2_swap", "N3_cadeias", "N4_retipar", "N5_trocar", "N6_dividir")
 
 
 class BuscaLocal:
     def __init__(self, sol, traco=None):
         self.s = sol
         self.inst = sol.inst
+        self.max_tipos = sol.max_tipos
         self.D = self.inst.D
         self.tc = self.inst.tipo_cand
         self.ids_t = [np.flatnonzero(self.tc == t) for t in range(T)]
@@ -192,7 +199,7 @@ class BuscaLocal:
             if movs == antes:
                 return movs
 
-    # ------------------------------------------------------------------------- N4 / N5
+    # ------------------------------------------------------------------------- N4 / N5 / N6
     def _transferir(self, j, u, t, L):
         """Avalia transferir L vagas do tipo u para o tipo t na escola j.
         Devolve (delta, despejos[(i, destino)], chegadas[i]) ou None se não melhora/inviável."""
@@ -251,32 +258,35 @@ class BuscaLocal:
             self.mover(i, j)
 
     def _classes(self, j):
-        """Salas da escola j agrupadas por (capacidade, tipo): salas iguais geram o mesmo vizinho."""
+        """Salas da escola j agrupadas por (capacidade, ((tipo, vagas), ...)): salas iguais geram o
+        mesmo vizinho."""
         cl = {}
-        for r, (cap, u) in enumerate(zip(self.inst.escolas[j].salas, self.s.tipo_sala[j])):
-            cl.setdefault((cap, int(u)), r)
+        for r, cap in enumerate(self.inst.escolas[j].salas):
+            cl.setdefault((cap, tuple(sorted(self.s.assentos(j, r).items()))), r)
         return cl
 
     def n4_retipar(self):
         for j in range(self.inst.N):
-            for (cap, u), r in self._classes(j).items():
-                for t in range(T):
-                    if t == u:
-                        continue
-                    res = self._transferir(j, u, t, cap)
-                    if res:
-                        delta, desp, cheg = res
-                        self._log(f"  N4 {self._eid(j)} sala {r + 1} ({cap}) "
-                                  f"{NOMES_TIPOS[u]} -> {NOMES_TIPOS[t]}: "
-                                  f"{len(cheg)} chegam, {len(desp)} saem, delta={delta:.4f}")
-                        self.s.tipo_sala[j][r] = t
-                        self._aplicar_transferencia(j, u, t, cap, desp, cheg)
-                        return 1
+            for (cap, a), r in self._classes(j).items():
+                for u, su in a:
+                    for t in range(T):
+                        if t == u:
+                            continue
+                        res = self._transferir(j, u, t, su)
+                        if res:
+                            delta, desp, cheg = res
+                            self._log(f"  N4 {self._eid(j)} sala {r + 1} ({cap}) "
+                                      f"{NOMES_TIPOS[u]} -> {NOMES_TIPOS[t]}"
+                                      + (f" ({su} vagas)" if su != cap else "") + ": "
+                                      f"{len(cheg)} chegam, {len(desp)} saem, delta={delta:.4f}")
+                            self.s.mover_assentos(j, r, u, t, su)
+                            self._aplicar_transferencia(j, u, t, su, desp, cheg)
+                            return 1
         return 0
 
     def n5_trocar(self):
         for j in range(self.inst.N):
-            cl = list(self._classes(j).items())
+            cl = [((cap, a[0][0]), r) for (cap, a), r in self._classes(j).items() if len(a) == 1]
             for (s1, u), r1 in cl:
                 for (s2, t), r2 in cl:
                     if u == t or s1 <= s2:
@@ -292,9 +302,42 @@ class BuscaLocal:
                         return 1
         return 0
 
+    def n6_dividir(self):
+        s, D = self.s, self.D
+        for j in range(self.inst.N):
+            # candidatos de cada tipo, em outras escolas, que ganhariam vindo para j
+            interessados = np.zeros(T, int)
+            for t in range(T):
+                ids = self.ids_t[t]
+                fora = ids[s.aloc[ids] != j]
+                interessados[t] = int((D[fora, s.aloc[fora]] - D[fora, j] > EPS).sum())
+            for (cap, a), r in self._classes(j).items():
+                tipos = dict(a)
+                for u, su in a:
+                    for t in range(T):
+                        if t == u or (t not in tipos and len(tipos) >= self.max_tipos):
+                            continue
+                        falta = interessados[t] - (s.cap[j, t] - s.carga[j, t])
+                        folga = s.cap[j, u] - s.carga[j, u]
+                        for L in sorted({int(min(falta, su)), int(min(folga, su))}):
+                            if not 0 < L < su:
+                                continue
+                            res = self._transferir(j, u, t, L)
+                            if res:
+                                delta, desp, cheg = res
+                                self._log(f"  N6 {self._eid(j)} sala {r + 1} ({cap}) {L} vagas "
+                                          f"{NOMES_TIPOS[u]} -> {NOMES_TIPOS[t]}: {len(cheg)} chegam, "
+                                          f"{len(desp)} saem, delta={delta:.4f}")
+                                s.mover_assentos(j, r, u, t, L)
+                                self._aplicar_transferencia(j, u, t, L, desp, cheg)
+                                return 1
+        return 0
+
     # ------------------------------------------------------------------------- VND
     def vnd(self, limite_s=None):
         viz = [self.n1_shift, self.n2_swap, self.n3_cadeias, self.n4_retipar, self.n5_trocar]
+        if self.max_tipos > 1:
+            viz.append(self.n6_dividir)
         t0 = time.perf_counter()
         self._log(f"== VND (inicial {self.s.custo:.4f})")
         k = 0

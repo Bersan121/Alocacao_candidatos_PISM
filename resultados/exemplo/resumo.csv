@@ -1,2 +1,2 @@
-instancia,M,N,salas,execucoes,k,inicial_media,inicial_dp,inicial_melhor,inicial_pior,final_media,final_dp,final_melhor,final_pior,melhoria_media_pct,t_construtivo_medio,t_busca_medio,t_total_medio,escolas_usadas_melhor,salas_usadas_melhor,execucao_melhor
-instancias_pism/instancia1_G8,316,12,24,1,10,1064.5285,0,1064.5285,1064.5285,983.8417,0,983.8417,983.8417,7.57958100699,0.00338170793839,0.0117380829761,0.0151197909145,12,24,0
+instancia,M,N,salas,execucoes,k,tipos_por_escola,inicial_media,inicial_dp,inicial_melhor,inicial_pior,final_media,final_dp,final_melhor,final_pior,melhoria_media_pct,t_construtivo_medio,t_busca_medio,t_total_medio,escolas_usadas_melhor,salas_usadas_melhor,execucao_melhor
+instancias_pism/instancia1_G8,316,12,24,1,10,1,1297.6374,0,1297.6374,1297.6374,1198.9524,0,1198.9524,1198.9524,7.60497501074,0.00341491703875,0.037465582951,0.0408804999897,12,24,0

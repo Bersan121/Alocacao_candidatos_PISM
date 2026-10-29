@@ -1,5 +1,5 @@
 # instancia: instancias/instancia_2
-# k: 10  execucao (semente): 5
+# k: 10  execucao (semente): 5  tipos por sala: 1
 # custo: 622.1067
 # escolas usadas: 10/10  salas usadas: 91/97
 # SALAS (escola, sala, capacidade, tipo, ocupacao)

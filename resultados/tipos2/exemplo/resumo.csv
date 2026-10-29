@@ -1,0 +1,2 @@
+instancia,M,N,salas,execucoes,k,tipos_por_sala,inicial_media,inicial_dp,inicial_melhor,inicial_pior,final_media,final_dp,final_melhor,final_pior,melhoria_media_pct,t_construtivo_medio,t_busca_medio,t_total_medio,escolas_usadas_melhor,salas_usadas_melhor,execucao_melhor
+instancias_pism/instancia1_G8,316,12,24,1,10,2,829.0001,0,829.0001,829.0001,690.7549,0,690.7549,690.7549,16.676137916,0.0036972919479,0.178801417002,0.182498708949,12,24,0

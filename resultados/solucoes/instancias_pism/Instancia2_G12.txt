@@ -1,5 +1,5 @@
 # instancia: instancias_pism/Instancia2_G12
-# k: 10  execucao (semente): 5
+# k: 10  execucao (semente): 5  tipos por sala: 1
 # custo: 90916.8568
 # escolas usadas: 15/15  salas usadas: 180/205
 # SALAS (escola, sala, capacidade, tipo, ocupacao)

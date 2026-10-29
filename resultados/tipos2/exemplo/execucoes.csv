@@ -1,0 +1,2 @@
+instancia,M,N,salas,execucao,k,tipos_por_sala,valor_inicial,valor_final,melhoria,melhoria_pct,t_construtivo,t_busca,t_total,retipagens_faseA,escolas_usadas,salas_usadas,dist_media,movs_N1_shift,ganho_N1_shift,movs_N2_swap,ganho_N2_swap,movs_N3_cadeias,ganho_N3_cadeias,movs_N4_retipar,ganho_N4_retipar,movs_N5_trocar,ganho_N5_trocar,movs_N6_dividir,ganho_N6_dividir
+instancias_pism/instancia1_G8,316,12,24,0,10,2,829.0001,690.7549,138.2452,16.676137916,0.0036972919479,0.178801417002,0.182498708949,2,12,24,2.18593322785,11,6.9497,68,89.5119,19,7.8409,8,20.0957,0,0,13,13.847

@@ -43,7 +43,9 @@
   candidate list) and a variable neighborhood descent with five neighborhoods. On the \nInst{}
   feasible instances of the class, the method ends, on average, \gapFin\% above the best known
   value (\gapLb\% above a lower bound), improving the initial solution by \melhoria\% and taking
-  \tempoMedio{} seconds per run on average.
+  \tempoMedio{} seconds per run on average. We also evaluate a variant in which a classroom may be
+  split between up to two exam types: it makes all \nInstDois{} instances feasible and reduces the
+  total distance by \reducaoDois\% on average.
 \end{abstract}
 
 \begin{resumo}
@@ -54,7 +56,9 @@
   por arrependimento estático com lista restrita de candidatos) e uma descida em vizinhança variável
   com cinco vizinhanças. Nas \nInst{} instâncias viáveis da turma, o método termina, em média,
   \gapFin\% acima do melhor valor conhecido (\gapLb\% acima de um limite inferior), melhora a
-  solução inicial em \melhoria\% e leva \tempoMedio{} segundos por execução, em média.
+  solução inicial em \melhoria\% e leva \tempoMedio{} segundos por execução, em média. Avaliamos
+  também uma variante em que uma sala pode ser dividida entre até dois tipos de prova: ela torna
+  viáveis as \nInstDois{} instâncias e reduz a distância total em \reducaoDois\%, em média.
 \end{resumo}
 
 % =====================================================================================
@@ -77,7 +81,10 @@ uma abordagem heurística para o problema, composta por:
   \item cinco estruturas de vizinhança, combinadas numa descida em vizinhança variável (VND)
     \cite{mladenovic1997} (Seção~\ref{sec:busca});
   \item um estudo experimental em \nExec{} execuções sobre \nInst{} instâncias, comparando os
-    resultados com um modelo de programação inteira e com um limite inferior (Seções~\ref{sec:experimentos} e~\ref{sec:resultados}).
+    resultados com um modelo de programação inteira e com um limite inferior (Seções~\ref{sec:experimentos} e~\ref{sec:resultados});
+  \item a avaliação de uma variante em que cada sala pode receber até dois tipos de prova, com o
+    número máximo de tipos por sala (1 ou 2) como parâmetro do programa
+    (Seção~\ref{sec:tipos-por-sala}).
 \end{itemize}
 
 O relatório prioriza a justificativa das decisões tomadas. A Seção~\ref{sec:problema} define o
@@ -118,6 +125,12 @@ candidatos de tipos diferentes, em salas diferentes. As justificativas são:
 \end{enumerate}
 A Seção~\ref{sec:comparacao-modelos} quantifica a diferença entre as duas interpretações.
 
+\textbf{Variante: até dois tipos por sala.} Avaliamos também uma flexibilização: uma sala pode ser
+dividida entre \emph{até dois} tipos de prova, com parte das carteiras para cada um (por exemplo,
+fileiras alternadas). Ela modela salas grandes que aplicam duas provas com o mesmo horário e o mesmo
+fiscal. O número máximo de tipos por sala é um parâmetro do programa (\texttt{-{}-tipos-por-sala},
+1 ou 2); o padrão, usado em todo o relatório salvo na Seção~\ref{sec:tipos-por-sala}, é 1.
+
 \subsection{Formulação}
 
 Com as variáveis $x_{ij} = 1$ se o candidato $i$ é alocado à escola $j$ e $y_{rt} = 1$ se a sala
@@ -138,6 +151,13 @@ tipo numa mesma escola são intercambiáveis, a restrição~\eqref{eq:cap}, agre
 suficiente: sempre existe uma distribuição dos candidatos entre essas salas que respeita a
 capacidade de cada uma. As duas decisões do enunciado aparecem como (i) quais locais
 (salas e, por consequência, escolas) são utilizados e (ii) para onde vai cada candidato.
+
+Na variante com até dois tipos por sala, acrescenta-se a variável inteira $z_{rt} \ge 0$, o número
+de lugares da sala $r$ reservados ao tipo $t$; a restrição~\eqref{eq:umtipo} passa a
+$\sum_{t} y_{rt} \le 2$, e o lado direito de~\eqref{eq:cap} passa a $\sum_{r \in R_j} z_{rt}$, com
+$z_{rt} \le q_r\, y_{rt}$ e $\sum_t z_{rt} \le q_r$. O modelo original é o caso
+$\sum_t y_{rt} \le 1$, e a variante é uma relaxação dele: toda solução com um tipo por sala
+continua viável.
 
 % =====================================================================================
 \section{Instâncias}\label{sec:instancias}
@@ -190,6 +210,11 @@ incremental duas matrizes $N \times |T|$: $\mathit{cap}[j,t]$, a soma das capaci
 de tipo $t$ na escola $j$, e $\mathit{carga}[j,t]$, o número de candidatos do tipo $t$ alocados à
 escola $j$, além do custo total. A solução é viável se e somente se
 $\mathit{carga}[j,t] \le \mathit{cap}[j,t]$ para todo $(j,t)$, condição verificada em $O(N|T|)$.
+
+Na variante com até dois tipos por sala, cada sala guarda também um segundo tipo
+$\mathit{tipo}_2[j][r]$ ($-1$ se não houver) e o número de lugares $v_2[j][r]$ reservados a ele; o
+tipo principal fica com os $q_r - v_2[j][r]$ restantes. $\mathit{cap}[j,t]$ passa a somar, em cada
+sala, os lugares dados ao tipo $t$, e o restante da representação não muda.
 
 A sala de cada candidato não faz parte da representação: ela é obtida no final, preenchendo as
 salas de cada par (escola, tipo) da maior para a menor, o que minimiza o número de salas usadas.
@@ -268,6 +293,12 @@ A fase A segue os passos do Algoritmo~\ref{alg:faseA}:
     menos a sua demanda; caso contrário, a fase B travaria com candidatos sem sala. Uma sala só
     muda de tipo $u$ para $t$ se o tipo $u$ continua coberto sem ela, o que garante que cada troca
     reduz o déficit total e que o laço termina.
+  \item \textbf{Com até dois tipos por sala}, duas linhas mudam. Na linha 6, se a sala escolhida é
+    maior que a falta $\phi$, os $q_r - \phi$ lugares que sobram vão para o tipo com a segunda maior
+    falta local, até cobri-la. Na linha 9, a sala não precisa mudar inteira: passam para $t$
+    $L = \min(\delta_t, -\delta_u, \text{lugares de } u \text{ na sala})$ lugares, desde que a sala
+    continue com no máximo dois tipos. Assim, a cobertura só falha se a capacidade total for menor
+    que o número de candidatos.
 \end{itemize}
 
 \subsection{Fase B: alocação dos candidatos}
@@ -285,7 +316,7 @@ A fase A segue os passos do Algoritmo~\ref{alg:faseA}:
   \linha{5} \textbf{enquanto} $\mathit{RCL} \ne \emptyset$:
   \linha{6} \quad sorteia $i \in \mathit{RCL}$ com probabilidade uniforme; retira $i$ da RCL
   \linha{7} \quad $j \gets$ primeira escola de $\mathit{pref}_i$ com sala do tipo $\tau(i)$ e vaga
-  \linha{8} \quad $r \gets$ maior sala de tipo $\tau(i)$ em $j$ com vaga; $\mathit{aloc}[i] \gets
+  \linha{8} \quad $r \gets$ sala de $j$ com mais lugares do tipo $\tau(i)$ e com vaga; $\mathit{aloc}[i] \gets
     j$; desconta uma vaga de $r$
   \linha{9} \quad insere na RCL o próximo candidato ainda não considerado da $\mathit{fila}$
 \end{algoritmo}
@@ -353,39 +384,49 @@ movimentos. Como a representação separa tipo das salas e alocação, há vizin
     Bellman-Ford em $O(N^3)$, é uma cadeia de realocações que melhora $f$. Quando não há ciclo
     negativo, a alocação é ótima para os tipos de sala atuais, pela condição de otimalidade do
     problema de transporte \cite{ahuja1993}.
-  \item[N4 (retipar sala).] Muda o tipo de uma sala de $u$ para $t$.
+  \item[N4 (retipar sala).] Muda o tipo de uma sala de $u$ para $t$. Com até dois tipos por
+    sala, passa para $t$ todos os lugares que o tipo $u$ tem na sala.
   \item[N5 (trocar tipos).] Troca os tipos de duas salas da mesma escola com tipos diferentes
     $u \ne t$ e capacidades $q_1 > q_2$. O efeito é transferir $q_1 - q_2$ vagas de $u$ para $t$
-    naquela escola: um ajuste fino, que N4 não consegue fazer quando as salas são grandes.
+    naquela escola: um ajuste fino, que N4 não consegue fazer quando as salas são grandes. Com até
+    dois tipos por sala, considera só salas com um único tipo.
+  \item[N6 (dividir sala).] Só existe na variante com até dois tipos por sala: passa $L$ lugares
+    do tipo $u$ de uma sala para o tipo $t$, que já está na sala ou se torna o seu segundo tipo,
+    com $1 \le L <$ lugares de $u$ na sala. Avaliar todo $L$ seria caro, então testamos dois valores
+    com significado claro: o número de lugares que faltam para receber todos os candidatos do tipo
+    $t$ que ganhariam vindo para a escola, e o número de lugares de $u$ ociosos na escola (que não
+    exige despejos). É o ajuste fino de capacidade que N5 faz de forma limitada, agora com
+    granularidade de um lugar.
 \end{description}
 
-N4 e N5 são ``transferir $L$ vagas do tipo $u$ para o tipo $t$ na escola $j$'' e são avaliadas da
-mesma forma: (i) \emph{chegadas}: até $L$ candidatos do tipo $t$ de outras escolas que ganham
+N4, N5 e N6 são ``transferir $L$ vagas do tipo $u$ para o tipo $t$ na escola $j$'' e são avaliadas
+da mesma forma: (i) \emph{chegadas}: até $L$ candidatos do tipo $t$ de outras escolas que ganham
 indo para $j$, os de maior ganho $d_{i,\mathit{aloc}[i]} - d_{ij} > 0$; (ii) \emph{despejos}: se
 a carga de $u$ em $j$ passar da nova capacidade, o excedente sai, cada um para a escola mais
 próxima com vaga do tipo $u$, começando pelos que perdem menos. O vizinho é aceito se
 $\Delta = \text{custo dos despejos} - \text{ganho das chegadas} < 0$ e é descartado se não houver
-vagas para todos os despejos, o que preserva a viabilidade. Salas iguais (mesma capacidade e mesmo
-tipo) geram o mesmo vizinho e são avaliadas uma vez só.
+vagas para todos os despejos, o que preserva a viabilidade. Salas iguais (mesma capacidade e mesma
+divisão entre os tipos) geram o mesmo vizinho e são avaliadas uma vez só.
 
 \subsection{Estratégia de busca: VND}
 
 As vizinhanças são combinadas numa descida em vizinhança variável (VND) \cite{mladenovic1997}, na
-ordem N1, N2, N3, N4, N5 (Algoritmo~\ref{alg:vnd}): das mais baratas e locais para as mais caras e
-estruturais. N1, N2 e N3 são aplicadas até o ótimo local da vizinhança; N4 e N5 aplicam o primeiro
+ordem N1, N2, N3, N4, N5 (Algoritmo~\ref{alg:vnd}), e N6 no fim quando a sala pode ter dois tipos:
+das mais baratas e locais para as mais caras e
+estruturais. N1, N2 e N3 são aplicadas até o ótimo local da vizinhança; N4, N5 e N6 aplicam o primeiro
 movimento de melhora (\emph{first improvement}), porque cada mudança de tipo altera as capacidades
 e exige reotimizar a alocação, o que é feito ao voltar para N1.
 
 \begin{algoritmo}[htbp]
   \caption{VND.}\label{alg:vnd}
   \small
-  \linha{1} $\mathcal{N} \gets (N1, N2, N3, N4, N5)$
+  \linha{1} $\mathcal{N} \gets (N1, N2, N3, N4, N5)$, mais N6 se a sala pode ter dois tipos
   \linha{2} $\ell \gets 1$
   \linha{3} \textbf{enquanto} $\ell \le |\mathcal{N}|$:
   \linha{4} \quad $s' \gets$ busca local em $\mathcal{N}_\ell$ a partir de $s$
   \linha{5} \quad \textbf{se} $f(s') < f(s)$: $s \gets s'$; $\ell \gets 1$ \quad
     \textbf{senão}: $\ell \gets \ell + 1$
-  \linha{6} \textbf{devolve} $s$ \quad (ótimo local em relação às cinco vizinhanças)
+  \linha{6} \textbf{devolve} $s$ \quad (ótimo local em relação a todas as vizinhanças)
 \end{algoritmo}
 
 % =====================================================================================
@@ -400,7 +441,9 @@ Para cada execução registramos: valor da solução inicial, valor após o VND,
 percentual, tempo do construtivo ($t_c$) e da busca ($t_{bl}$), número de escolas e de salas
 utilizadas, e o número de movimentos e o ganho de cada vizinhança. Para cada instância
 relatamos média, desvio padrão, melhor e pior valor das 10 execuções, como pede o enunciado para
-métodos com componentes aleatórios.
+métodos com componentes aleatórios. O experimento completo foi feito duas vezes, com no máximo um
+tipo de prova por sala (\texttt{-{}-tipos-por-sala 1}, a configuração principal) e com até dois
+(\texttt{-{}-tipos-por-sala 2}, Seção~\ref{sec:tipos-por-sala}).
 
 \textbf{Valores de referência.} Para medir a qualidade, resolvemos o
 modelo~\eqref{eq:obj}--\eqref{eq:cap} com o HiGHS \cite{huangfu2018}, via SciPy
@@ -412,7 +455,9 @@ compartilhada livremente entre os tipos, que é a relaxação linear do MIP e se
 problema de transporte.
 O \emph{gap} de um valor $v$ é $100\,(v - v^\star)/v^\star$, sendo $v^\star$ a referência. Quando
 a referência é o melhor valor conhecido e a heurística o encontrou, o gap é zero mesmo sem prova de
-otimalidade; por isso também reportamos o gap até o LB, que é uma garantia.
+otimalidade; por isso também reportamos o gap até o LB, que é uma garantia. O LB também vale para
+a variante com até dois tipos por sala, pois ela é mais restrita que essa relaxação; para a
+variante não resolvemos o MIP, e a qualidade é medida apenas pelo gap até o LB.
 
 % =====================================================================================
 \section{Resultados}\label{sec:resultados}
@@ -436,7 +481,7 @@ Figura~\ref{fig:gaps} resume a qualidade.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figuras/gaps.pdf}
+  \includegraphics[width=\textwidth]{figuras/gaps.png}
   \caption{Gap até o melhor valor conhecido da solução inicial (média de 10 execuções) e da
     solução após o VND, por instância.}
   \label{fig:gaps}
@@ -477,7 +522,8 @@ alocação final é ótima para os tipos de sala encontrados.
 \begin{table}[htbp]
   \centering
   \caption{Movimentos aplicados por execução, ganho por execução (em \% do valor inicial) e
-    participação de cada vizinhança na melhoria total (médias por instância).}
+    participação de cada vizinhança na melhoria total (médias por instância), com um tipo por sala
+    e com até dois (Seção~\ref{sec:tipos-por-sala}). N6 só existe com dois tipos.}
   \label{tab:vizinhancas}
   \small
   \input{tabelas/vizinhancas.tex}
@@ -485,8 +531,9 @@ alocação final é ótima para os tipos de sala encontrados.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figuras/vizinhancas.pdf}
-  \caption{Participação de cada vizinhança na melhoria obtida pelo VND.}
+  \includegraphics[width=\textwidth]{figuras/vizinhancas.png}
+  \caption{Participação de cada vizinhança na melhoria obtida pelo VND, com um tipo por sala e com
+    até dois.}
   \label{fig:vizinhancas}
 \end{figure}
 
@@ -494,14 +541,15 @@ alocação final é ótima para os tipos de sala encontrados.
 
 O construtivo leva no máximo \tConstrMax~s. O tempo total (Figura~\ref{fig:tempo}) é dominado
 pelo VND: \tempoMedio~s em média e \tempoMax~s no caso mais lento, \tempoMaxId. O tempo da busca
-acompanha o número de mudanças de tipo de sala aceitas (N4 e N5; correlação de 0,96 entre as
-execuções) muito mais do que o número de candidatos (0,31), porque cada mudança aceita reinicia a
-VND em N1, que volta a percorrer todos os candidatos. Em \tempoMaxId{} o VND aceita 134 mudanças de
-tipo por execução (24 em N4 e 110 em N5), contra no máximo algumas dezenas nas demais.
+acompanha o número de mudanças de tipo de sala aceitas (N4 e N5; correlação de \corrTempoTipos{}
+entre as execuções) muito mais do que o número de candidatos (\corrTempoM), porque cada mudança
+aceita reinicia a VND em N1, que volta a percorrer todos os candidatos. Em \tempoMaxId{} o VND
+aceita \movsTiposLenta{} mudanças de tipo por execução (\movsNQuatroLenta{} em N4 e
+\movsNCincoLenta{} em N5), contra no máximo algumas dezenas nas demais.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figuras/tempo.pdf}
+  \includegraphics[width=\textwidth]{figuras/tempo.png}
   \caption{Tempo médio por execução (construtivo e VND) em função do número de candidatos.}
   \label{fig:tempo}
 \end{figure}
@@ -518,7 +566,7 @@ melhorias da Seção~\ref{sec:conclusao}.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figuras/variabilidade.pdf}
+  \includegraphics[width=\textwidth]{figuras/variabilidade.png}
   \caption{Desvio percentual de cada uma das 10 execuções em relação à média da instância, na
     solução inicial e após o VND.}
   \label{fig:variabilidade}
@@ -553,7 +601,7 @@ perturbações nos tipos das salas (Seção~\ref{sec:conclusao}).
 
 Como não há custo de abertura e a folga é pequena, todas as escolas são usadas em quase todas as
 instâncias (Tabela~\ref{tab:qualidade}); a exceção é \idFechou, que tem a maior folga do conjunto
-(23,4\%) e deixa duas escolas fechadas. A Figura~\ref{fig:distribuicao} e a
+(\folgaFechou\%) e deixa \escolasFechadas{} escolas fechadas. A Figura~\ref{fig:distribuicao} e a
 Tabela~\ref{tab:distribuicao} mostram a distribuição dos candidatos na melhor solução da instância
 do grupo \idGrupo{} (5917 candidatos, 20 escolas, 197 salas). Quinze das 20 escolas recebem
 os seis tipos de prova, cada um em uma ou mais salas; 13 escolas ficam com todas as salas tipadas
@@ -561,7 +609,7 @@ cheias, e a folga se concentra em poucas escolas (E18 usa só 26\% da capacidade
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figuras/distribuicao.pdf}
+  \includegraphics[width=\textwidth]{figuras/distribuicao.png}
   \caption{Candidatos por escola e tipo de prova na melhor solução de \idGrupo{}; o
     traço preto indica a capacidade total das salas da escola.}
   \label{fig:distribuicao}
@@ -594,11 +642,79 @@ que a melhor solução por escola, mas a nossa heurística termina \gapDoisUmUm\
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figuras/modelos.pdf}
+  \includegraphics[width=\textwidth]{figuras/modelos.png}
   \caption{Redução da distância total da melhor solução com um tipo por sala em relação à melhor
     solução conhecida com um tipo por escola (instâncias viáveis nos dois modelos).}
   \label{fig:modelos}
 \end{figure}
+
+\subsection{Até dois tipos por sala}\label{sec:tipos-por-sala}
+
+Repetimos o experimento principal (10 execuções por instância, $k = 10$) permitindo que cada sala
+seja dividida entre até dois tipos de prova (\texttt{-{}-tipos-por-sala 2}), num total de
+\nExecDois{} execuções. Não há MIP para essa variante, então a comparação usa o limite inferior de
+transporte (LB), que vale para os dois modelos. Note que esse gap é maior que o da
+Tabela~\ref{tab:qualidade}, que usa o maior entre o LB e o limite do MIP, válido só para um tipo
+por sala. A Tabela~\ref{tab:tipos-por-sala} compara as melhores soluções, a
+Figura~\ref{fig:tipos-por-sala} mostra o gap até o LB, e a Tabela~\ref{tab:resultados-tipos2}
+traz os valores das 10 execuções.
+
+\begin{itemize}
+  \item \textbf{Viabilidade.} As \nInstDois{} instâncias são viáveis, inclusive \idInviavel, que
+    não tem solução com um tipo por sala. A heurística chega a \finalInviavelDois, apenas
+    \gapLbInviavelDois\% acima do LB, dividindo \divididasInviavelDois{} das 20 salas.
+  \item \textbf{Distância.} Em nenhuma instância a melhor solução fica pior que a de um tipo por
+    sala (o que é esperado, pois a variante é uma relaxação). A distância total cai \reducaoDois\%
+    em média, de \reducaoDoisMin\% (\reducaoDoisMinId) a \reducaoDoisMax\%
+    (\reducaoDoisMaxId), e cai pelo menos 1\% em \nReducaoUm{} instâncias. O gap médio até o LB
+    vai de \gapLbUm\% para \gapLbDois\%: dividir as salas elimina, em média, \fechadoDois\% da
+    distância entre a solução com um tipo e o LB.
+  \item \textbf{Onde o ganho aparece.} As cinco maiores reduções (\maioresReducoesDois) estão em
+    instâncias pequenas, com até \maioresReducoesMmax{} candidatos e poucas salas pequenas, o mesmo
+    perfil em que a abordagem com um tipo por sala vai mal (Seção~\ref{sec:ruim}). Nelas, a granularidade das salas é o que impede de pôr cada tipo perto
+    da sua demanda, e dividir as salas remove essa barreira. Nas instâncias grandes, com muitas salas
+    de tamanhos variados, a capacidade por tipo já era ajustada com granularidade fina, e o ganho
+    fica abaixo de 1\% em \nGrandesAbaixoUm{} das \nGrandes{} instâncias com mais de mil
+    candidatos.
+  \item \textbf{Salas divididas.} Na melhor solução, \divididasDois\% das salas são divididas, em
+    média. O modelo não atribui custo à divisão, então a heurística divide sempre que isso reduz a
+    distância, mesmo que pouco. Se dividir uma sala tiver custo na prática (mais fiscais, cadernos
+    trocados), o natural é acrescentar à função objetivo uma penalidade por sala dividida.
+  \item \textbf{Vizinhanças e tempo.} N6 responde por \partNSeis\% da melhoria
+    (Tabela~\ref{tab:vizinhancas}), e N5 quase deixa de atuar, pois N6 faz o mesmo ajuste fino com
+    granularidade de um lugar. A melhoria média da busca local cai para \melhoriaDois\%, porque a
+    fase A já usa a divisão para encaixar as faltas locais e o construtivo parte de soluções
+    melhores. O tempo médio por execução é \tempoMedioDois~s (máximo de \tempoMaxDois~s em
+    \tempoMaxDoisId), e as 10 execuções de cada instância terminam no mesmo valor (CV final máximo
+    de \cvFinDoisMax\%).
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figuras/tipos_por_sala.png}
+  \caption{Gap até o limite inferior de transporte da melhor solução com um tipo por sala e com até
+    dois. $^\dagger$: inviável com um tipo por sala.}
+  \label{fig:tipos-por-sala}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Comparação entre um e até dois tipos por sala: melhor valor das 10 execuções, redução da
+    distância, gap até o limite inferior de transporte, salas divididas na melhor solução e tempo
+    médio por execução.}
+  \label{tab:tipos-por-sala}
+  \scriptsize
+  \input{tabelas/tipos_por_sala.tex}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Até dois tipos por sala: valor da solução inicial e após o VND nas 10 execuções (média,
+    desvio padrão, melhor e pior).}
+  \label{tab:resultados-tipos2}
+  \scriptsize
+  \input{tabelas/resultados_tipos2.tex}
+\end{table}
 
 % =====================================================================================
 \section{Exemplo passo a passo}\label{sec:exemplo}
@@ -627,6 +743,15 @@ e chega a 990,93. N4 não melhora; N5 troca os tipos das duas salas de E4 (M2 na
 15 passam a M3s e M2), ganhando 2,41. A VND volta a N1 e, após mais duas trocas em N5 (E7 e E10) e
 alguns movimentos de N1, N2 e N3, para em 983,84, uma melhoria de 7,6\% sobre a solução inicial.
 
+\textbf{Com até dois tipos por sala.} Na mesma instância e semente, a fase A divide as 24 salas já
+na linha 6: em E1, a sala 2 fica com M3e (falta 8) e os 6 lugares restantes vão para M2 (falta 6);
+a sala 1 fica com M1 (falta 5) e reserva 4 lugares para M3d (falta 4). A cobertura só precisa
+passar 8 lugares para M3d, em duas salas, sem mudar nenhuma sala inteira. A solução inicial custa
+829,00, já abaixo da solução \emph{final} com um tipo por sala. O VND usa N6 em 13 movimentos (por
+exemplo, 3 lugares de M2 passam para M3h na sala 1 de E4, e 3 candidatos M3h chegam) e termina em
+\finalExemploDois, \reducaoExemploDois\% abaixo do resultado com um tipo por sala, com o gap até o
+LB caindo de \gapLbExemplo\% para \gapLbExemploDois\%.
+
 % =====================================================================================
 \section{Onde a abordagem não vai bem}\label{sec:ruim}
 
@@ -650,7 +775,9 @@ perfil vão mal: \idInstUm{} (\gapInstUm\%), \idInstDois{} (\gapInstDois\%) e \i
 \end{enumerate}
 A Figura~\ref{fig:gaps} mostra que esse comportamento se concentra nas instâncias pequenas; nas
 grandes, com mais salas por escola e salas de tamanhos variados, a capacidade por tipo é ajustada
-com granularidade fina e o resultado fica perto da referência.
+com granularidade fina e o resultado fica perto da referência. A variante com até dois tipos por
+sala confirma o diagnóstico da causa 1: nas quatro instâncias citadas, ela reduz a distância entre
+\reducaoRuimMin\% e \reducaoRuimMax\% (Seção~\ref{sec:tipos-por-sala}).
 
 \textbf{Instância inviável.} Em \idInviavel{} (100 candidatos, 5 escolas, 20 salas de 5 ou 6
 lugares, 105 vagas) a construção para na etapa de cobertura da fase A. A inviabilidade é real: a
@@ -659,7 +786,9 @@ menos duas de 6 lugares ($6+6+5$), mas só há quatro salas de 6, o que atende n
 tipos. O modelo exato de cobertura confirma que não existe atribuição de tipos às salas que cubra a
 demanda. Nesse caso a abordagem não ``vai mal'': não existe solução, e o método o reconhece sem
 gastar tempo de busca. A folga total de 5\% esconde o problema, que só aparece ao considerar a
-granularidade das salas.
+granularidade das salas. Permitindo até dois tipos por sala, a granularidade deixa de ser
+obstáculo e a instância passa a ter solução, a \gapLbInviavelDois\% do LB
+(Seção~\ref{sec:tipos-por-sala}).
 
 % =====================================================================================
 \section{Conclusões}\label{sec:conclusao}
@@ -669,7 +798,11 @@ de localização de locais de prova, interpretando cada sala como um local de pr
 cobertura da fase A garante que a construção nunca trava, e todas as soluções geradas são viáveis,
 dispensando penalização. Nas \nInst{} instâncias viáveis da turma, o método termina \gapFin\%
 acima do melhor valor conhecido em média (\gapLb\% acima do limite inferior), supera o MIP de 60~s
-em \melhorQueMip{} instâncias e leva \tempoMedio~s por execução em média.
+em \melhorQueMip{} instâncias e leva \tempoMedio~s por execução em média. Com até dois tipos por
+sala, opção escolhida por parâmetro, todas as \nInstDois{} instâncias são viáveis, a distância cai
+\reducaoDois\% em média (até \reducaoDoisMax\% nas instâncias pequenas) e o gap até o LB vai de
+\gapLbUm\% para \gapLbDois\%. Se a divisão de salas é aceitável na prática é uma decisão da
+organização do exame; o experimento mede quanto ela vale.
 
 \textbf{Principais dificuldades.} (i) A heterogeneidade das instâncias: versões anteriores usavam
 seis formatos de arquivo, e a versão final ainda traz variações de cabeçalho, arquivos sem dados,
@@ -689,6 +822,8 @@ contornada com o limite inferior.
     em vez da avaliação gulosa.
   \item Usar o limite inferior como critério de parada: quando o gap até o LB fica abaixo de uma
     tolerância, não há o que buscar.
+  \item Na variante com até dois tipos por sala, penalizar a divisão de salas na função objetivo,
+    para dividir apenas onde o ganho em distância compensa.
 \end{itemize}
 
 \bibliographystyle{sbc}

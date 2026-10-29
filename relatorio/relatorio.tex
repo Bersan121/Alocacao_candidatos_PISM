@@ -23,76 +23,46 @@
 \title{Heurística construtiva e busca em vizinhança variável\\
   para a localização de locais de prova}
 
-% TODO: nomes e e-mails dos integrantes do grupo
-\author{Integrante 1\inst{1}, Integrante 2\inst{1}, Integrante 3\inst{1}}
+\author{Vinícius Latini Gonçalves\inst{1}, Gustavo Bersan Moreira Campos\inst{1}}
 
 \address{Departamento de Ciência da Computação -- Universidade Federal de Juiz de Fora (UFJF)\\
   Juiz de Fora -- MG -- Brasil
-  \email{\{integrante1,integrante2,integrante3\}@estudante.ufjf.br}
+  \email{vinicius.latini@estudante.ufjf.br}~{\normalfont\footnotesize(matrícula 202165149C)}
+  \email{bersan.gustavo@estudante.ufjf.br}~{\normalfont\footnotesize(matrícula 202435019)}
+  \\[4pt]{\footnotesize Repositório: \url{https://github.com/Bersan121/Alocacao_candidatos_PISM.git}}
 }
 
 \begin{document}
 
 \maketitle
 
-\begin{abstract}
-  This report addresses the exam location problem of a university admission exam, a variant of the
-  single source capacitated facility location problem in which every candidate must be assigned to a
-  school offering his or her exam type. Each classroom applies a single exam type and each school
-  offers at most $K$ types, with $K \in \{1, 2\}$ given as a parameter ($K = 1$ is the original
-  problem). We propose a two-phase constructive heuristic (school and room typing followed by a
-  static-regret allocation with a restricted candidate list) and a variable neighborhood descent with
-  seven neighborhoods. With one type per school, on the \nInstUm{} feasible instances of the class,
-  the method ends, on average, \gapFinUm\% above the best known value (\gapLbUm\% above a lower
-  bound), improving the initial solution by \melhoriaUm\% in \tempoMedioUm{} seconds per run on
-  average. Allowing two types per school makes \nInstDois{} instances feasible and reduces the total
-  distance by \reducao\% on average.
-\end{abstract}
-
-\begin{resumo}
-  Este relatório trata do problema de localização de locais de prova de um processo seletivo, uma
-  variante do problema de localização de facilidades capacitadas com fonte única em que cada
-  candidato deve ser alocado a uma escola que ofereça o seu tipo de prova. Cada sala aplica um único
-  tipo de prova e cada escola oferece no máximo $K$ tipos, com $K \in \{1, 2\}$ passado como
-  parâmetro ($K = 1$ é o problema original). Propomos uma heurística construtiva em duas fases
-  (escolha dos tipos das escolas e das salas, seguida de alocação por arrependimento estático com
-  lista restrita de candidatos) e uma descida em vizinhança variável com sete vizinhanças. Com um
-  tipo por escola, nas \nInstUm{} instâncias viáveis da turma, o método termina, em média,
-  \gapFinUm\% acima do melhor valor conhecido (\gapLbUm\% acima de um limite inferior), melhora a
-  solução inicial em \melhoriaUm\% e leva \tempoMedioUm{} segundos por execução, em média. Permitir
-  dois tipos por escola torna \nInstDois{} instâncias viáveis e reduz a distância total em
-  \reducao\%, em média.
-\end{resumo}
-
 % =====================================================================================
 \section{Introdução}
 
 Todo ano, processos seletivos como o Programa de Ingresso Seletivo Misto (PISM) da UFJF precisam
-decidir em quais escolas aplicar as provas e para qual escola enviar cada candidato. Os candidatos
-fazem provas de tipos diferentes (módulos e áreas), uma sala não pode aplicar dois tipos de prova ao
-mesmo tempo e cada escola tem um número limitado de lugares. Uma alocação ruim obriga milhares de
-candidatos a atravessar a cidade, enquanto uma boa alocação reduz deslocamentos, atrasos e custos
-de transporte.
+decidir em quais escolas aplicar as provas e para qual escola mandar cada candidato. Os candidatos
+fazem provas de tipos diferentes (módulos e áreas), uma sala não aplica dois tipos de prova ao mesmo
+tempo e cada escola tem um número limitado de lugares. Se a alocação for ruim, milhares de
+candidatos atravessam a cidade no dia da prova; uma alocação boa reduz deslocamentos, atrasos e
+custos de transporte.
 
-O problema foi estudado por \cite{oliveira2021}, que o modelam como uma variante do
-\emph{Single Source Capacitated Facility Location Problem} (SSCFLP): cada candidato é atendido por
-um único local, os locais têm capacidade e só podem oferecer um tipo de prova. Este trabalho propõe
-uma abordagem heurística para o problema, composta por:
-\begin{itemize}
-  \item uma heurística construtiva em duas fases que sempre gera uma solução viável quando a
-    instância tem solução (Seção~\ref{sec:construtivo});
-  \item sete estruturas de vizinhança, combinadas numa descida em vizinhança variável (VND)
-    \cite{mladenovic1997} (Seção~\ref{sec:busca});
-  \item um estudo experimental comparando os resultados com um modelo de programação inteira e com
-    um limite inferior (Seções~\ref{sec:experimentos} e~\ref{sec:resultados}), com o número máximo
-    de tipos de prova por escola (1 ou 2) como parâmetro do programa.
-\end{itemize}
+\cite{oliveira2021} modelam o problema como uma variante do \emph{Single Source Capacitated
+Facility Location Problem} (SSCFLP): cada candidato é atendido por um único local, os locais têm
+capacidade e cada local oferece um só tipo de prova. Aqui exigimos o tipo único de cada sala e
+deixamos cada escola oferecer até dois tipos, em salas diferentes
+(Seção~\ref{sec:interpretacao}). Para esse problema propomos uma heurística construtiva em duas
+fases, que sempre encontra uma solução viável quando a instância tem solução
+(Seção~\ref{sec:construtivo}), e uma descida em vizinhança variável (VND) \cite{mladenovic1997} com
+sete vizinhanças (Seção~\ref{sec:busca}). Os resultados são comparados com um modelo de programação
+inteira e com um limite inferior (Seções~\ref{sec:experimentos} e~\ref{sec:resultados}). O
+código-fonte e os arquivos para reproduzir os experimentos estão em
+\url{https://github.com/Bersan121/Alocacao_candidatos_PISM.git}.
 
-O relatório prioriza a justificativa das decisões tomadas. A Seção~\ref{sec:problema} define o
-problema e a interpretação adotada; a Seção~\ref{sec:instancias} caracteriza as instâncias, cujas
-propriedades motivam as decisões seguintes; a Seção~\ref{sec:exemplo} mostra um exemplo passo a
-passo; a Seção~\ref{sec:ruim} discute os casos em que a abordagem não vai bem; e a
-Seção~\ref{sec:conclusao} conclui.
+Ao longo do texto procuramos justificar cada decisão. A Seção~\ref{sec:problema} define o problema
+e a interpretação que adotamos, e a Seção~\ref{sec:instancias} descreve as instâncias, cujas
+propriedades guiaram o projeto da heurística. Depois de apresentar o método e os resultados,
+mostramos um exemplo passo a passo (Seção~\ref{sec:exemplo}), discutimos os casos em que a
+abordagem vai mal (Seção~\ref{sec:ruim}) e concluímos na Seção~\ref{sec:conclusao}.
 
 % =====================================================================================
 \section{Descrição do problema}\label{sec:problema}
@@ -102,26 +72,25 @@ Seção~\ref{sec:conclusao} conclui.
 Considere um conjunto de candidatos $C$ ($|C| = M$), um conjunto de escolas $L$ ($|L| = N$), cada
 escola $j$ com um conjunto de salas $R_j$, sendo $q_r$ a capacidade da sala $r$, e o conjunto de
 tipos de prova $T = \{\mathrm{M1}, \mathrm{M2}, \mathrm{M3e}, \mathrm{M3s}, \mathrm{M3h},
-\mathrm{M3d}\}$. Cada candidato $i$ tem um tipo de prova $\tau(i) \in T$ e $d_{ij}$ é a distância
+\mathrm{M3d}\}$. Cada candidato $i$ tem um tipo de prova $\tau(i) \in T$, e $d_{ij}$ é a distância
 do candidato $i$ à escola $j$. A capacidade da escola é $Q_j = \sum_{r \in R_j} q_r$. Nenhuma
-escola vem com tipo definido: o tipo é decisão do modelo.
+escola vem com tipo definido; os tipos são decididos pelo modelo.
 
-\subsection{Interpretação adotada: salas com um tipo, escolas com até $K$ tipos}\label{sec:interpretacao}
+\subsection{Interpretação adotada: salas com um tipo, escolas com até dois tipos}\label{sec:interpretacao}
 
-O enunciado estabelece que cada local de prova oferece apenas um tipo de exame. Adotamos como
-\textbf{local de prova a escola} e acrescentamos duas regras:
-\begin{enumerate}
-  \item \textbf{Cada sala aplica um único tipo de prova.} É a restrição física do processo real:
-    todos os candidatos de uma sala fazem a mesma prova, com o mesmo tempo e o mesmo fiscal. Por
-    isso nenhuma sala é dividida entre tipos.
-  \item \textbf{Cada escola oferece no máximo $K$ tipos de prova}, com $K \in \{1, 2\}$ escolhido
-    por parâmetro do programa (\texttt{-{}-tipos-por-escola}). Os tipos da escola são os tipos das
-    suas salas. Com $K = 1$ (o padrão) todas as salas da escola aplicam a mesma prova, que é
-    exatamente o problema do enunciado. Com $K = 2$ a escola pode receber dois tipos, em salas
-    diferentes; isso modela uma organização em que cada escola tem uma ou duas coordenações de prova,
-    e mede quanto a restrição de um tipo por escola custa em distância.
-\end{enumerate}
-Os resultados principais usam $K = 1$; a Seção~\ref{sec:tipos-por-escola} compara com $K = 2$.
+O enunciado diz que cada local de prova oferece apenas um tipo de exame. Adotamos duas regras. A
+primeira é que cada sala aplica um único tipo de prova, porque é assim que o processo funciona na
+prática: todos os candidatos de uma sala fazem a mesma prova, com o mesmo tempo e o mesmo fiscal.
+Nenhuma sala é dividida entre tipos.
+
+A segunda é que cada escola oferece no máximo $K = 2$ tipos de prova, em salas diferentes, e os
+tipos da escola são os tipos das suas salas. A ideia é que cada escola tenha uma ou duas
+coordenações de prova. A logística continua simples, com no máximo dois conjuntos de provas e dois
+horários de término por escola, e a escola deixa de ficar presa a um único tipo, o que permite
+mandar mais candidatos para escolas perto de casa.
+
+O limite $K$ é um parâmetro do programa (\texttt{-{}-tipos-por-escola}); todos os resultados deste
+relatório usam $K = 2$.
 
 \subsection{Formulação}
 
@@ -137,59 +106,58 @@ $j$ oferece o tipo $t$ e $z_{rt} = 1$ se a sala $r$ aplica a prova do tipo $t$, 
     \label{eq:cap}\\
   & x_{ij},\, y_{jt},\, z_{rt} \in \{0, 1\}.
 \end{align}
-A restrição~\eqref{eq:uma} aloca cada candidato a exatamente uma escola;~\eqref{eq:umtipo} dá no
-máximo um tipo a cada sala;~\eqref{eq:salaescola} e~\eqref{eq:k} limitam a $K$ os tipos de cada
-escola;~\eqref{eq:cap} garante, ao mesmo tempo, a capacidade e a compatibilidade: candidatos do tipo
-$t$ só ocupam salas do tipo $t$, até a soma das capacidades dessas salas. Como salas do mesmo tipo
-numa mesma escola são intercambiáveis, a restrição~\eqref{eq:cap}, agregada por escola, é
-suficiente: sempre existe uma distribuição dos candidatos entre essas salas que respeita a
-capacidade de cada uma. Com $K = 1$ não há motivo para deixar uma sala sem o tipo da escola, e o
-lado direito de~\eqref{eq:cap} vira $Q_j\, y_{jt}$. As duas decisões do enunciado aparecem como
-(i) quais escolas são utilizadas, e com quais tipos, e (ii) para onde vai cada candidato.
+A restrição~\eqref{eq:uma} manda cada candidato para exatamente uma escola, e~\eqref{eq:umtipo} dá
+no máximo um tipo a cada sala. As restrições~\eqref{eq:salaescola} e~\eqref{eq:k} limitam a $K$ os
+tipos de cada escola. A restrição~\eqref{eq:cap} cuida ao mesmo tempo da capacidade e da
+compatibilidade, pois candidatos do tipo $t$ só ocupam salas do tipo $t$, até a soma das
+capacidades dessas salas. Basta escrevê-la por escola: salas do mesmo tipo numa mesma escola são
+intercambiáveis, e sempre existe um jeito de distribuir os candidatos entre elas respeitando a
+capacidade de cada uma. As duas decisões do enunciado aparecem como (i) quais escolas são usadas, e
+com quais tipos, e (ii) para onde vai cada candidato.
 
 % =====================================================================================
 \section{Instâncias}\label{sec:instancias}
 
-Usamos as instâncias do grupo (pasta \texttt{instancias}, marcadas com $^\ddagger$) e as instâncias
-oficiais da turma (pasta \texttt{instancias\_pism}, um par por grupo, G1 a G14). Todas seguem o
-mesmo formato de texto; o leitor aceita ainda a variação do G6, que traz as duas contagens na mesma
-linha. Dois arquivos do G7 continham apenas um caminho de arquivo, sem dados, e foram descartados,
-assim como cópias repetidas das instâncias do G9. As instâncias do nosso grupo são as do G3 e entram
-uma só vez. Restam \nTotal{} instâncias, listadas na Tabela~\ref{tab:instancias}, com \Mmin{} a
-\Mmax{} candidatos e \Nmin{} a \Nmax{} escolas. Os identificadores da tabela, em ordem crescente de
-número de candidatos, são usados no restante do texto.
+Usamos as instâncias do nosso grupo (pasta \texttt{instancias}, marcadas com $^\ddagger$) e as
+instâncias oficiais da turma (pasta \texttt{instancias\_pism}, um par por grupo, de G1 a G14).
+Todas seguem o mesmo formato de texto, e o leitor aceita também a variação do G6, que traz as duas
+contagens na mesma linha. Um arquivo do G7 continha apenas um caminho de arquivo, sem dados, e foi
+descartado; arquivos com conteúdo repetido entram uma só vez, o que inclui as instâncias do nosso
+grupo, que são as do G3. Sobram \nTotal{} instâncias, listadas na Tabela~\ref{tab:instancias}, com
+\Mmin{} a \Mmax{} candidatos e \Nmin{} a \Nmax{} escolas. No resto do texto nos referimos a elas
+pelos identificadores da tabela, numerados em ordem crescente de número de candidatos.
 
 \begin{table}[htbp]
   \centering
   \caption{Instâncias utilizadas (\emph{Folga}: capacidade total acima do número de candidatos;
-    \emph{Viável com}: existe solução com no máximo 1 ou 2 tipos de prova por escola).}
+    \emph{Viável}: existe solução com um tipo por sala e até dois tipos por escola).}
   \label{tab:instancias}
   \scriptsize
   \input{tabelas/instancias.tex}
 \end{table}
 
-A análise das instâncias, feita antes de projetar a heurística, revelou cinco propriedades que
-orientaram as decisões:
+Antes de projetar a heurística, analisamos as instâncias. Cinco propriedades orientaram as
+decisões:
 \begin{enumerate}
-  \item \textbf{A folga de capacidade é pequena} (\folgaMin\% a \folgaMax\%). Quase todas as escolas
-    precisam ser usadas, e a decisão principal não é \emph{abrir ou fechar} escolas, mas \emph{qual
-    tipo cada escola oferece}.
-  \item \textbf{Cobrir os seis tipos é difícil.} Com $K = 1$, a capacidade das escolas de cada tipo
-    precisa cobrir a demanda daquele tipo, um problema de cobertura de \emph{bins}. Em
-    \nSoDois{} instâncias (\soDois) isso é impossível, embora a capacidade total sobre, e só
-    há solução com $K = 2$. \idInviavel{} não tem solução nem com $K = 2$
-    (Seção~\ref{sec:ruim}). Mesmo nas instâncias viáveis, a cobertura costuma ficar justa, o que
-    restringe as mudanças de tipo.
-  \item \textbf{A capacidade é restritiva.} Se cada candidato fosse para a escola mais próxima,
-    entre \fracSobreMin\% e \fracSobreMax\% deles cairiam numa escola lotada, com carga de até
-    \sobrecargaMax{} vezes a capacidade.
-    Por isso a alocação precisa tratar a capacidade desde o início, e as vizinhanças precisam
-    trocar candidatos, e não só movê-los para vagas livres.
-  \item \textbf{Não há custo de abertura.} O objetivo é apenas a distância; usar uma sala a mais
-    nunca piora a solução. Isso permite dar tipo a todas as salas, ainda que algumas fiquem vazias.
-  \item \textbf{As unidades das distâncias variam.} Em algumas instâncias a matriz está em graus
-    (valores próximos de 0,1), em outras em quilômetros. Por isso os resultados são comparados em
-    \emph{gap} percentual, e não em valor absoluto.
+  \item A folga de capacidade é pequena, de \folgaMin\% a \folgaMax\%. Quase todas as escolas
+    precisam ser usadas, então a decisão principal deixa de ser abrir ou fechar escolas e passa a
+    ser quais tipos cada escola oferece.
+  \item Cobrir os seis tipos dá trabalho. As salas de cada tipo precisam somar capacidade para a
+    demanda daquele tipo, e como as salas são indivisíveis isso é um problema de cobertura de
+    \emph{bins}, dificultado ainda pelo limite de dois tipos por escola. \nInst{} das \nTotal{}
+    instâncias têm solução; \idInviavel{} não tem, embora a capacidade total sobre
+    (Seção~\ref{sec:ruim}). Mesmo nas viáveis a cobertura costuma ficar justa, o que limita as
+    mudanças de tipo.
+  \item A capacidade aperta. Se cada candidato fosse para a escola mais próxima, entre
+    \fracSobreMin\% e \fracSobreMax\% deles cairiam numa escola lotada, com carga de até
+    \sobrecargaMax{} vezes a capacidade. A alocação precisa levar a capacidade em conta desde o
+    início, e as vizinhanças precisam trocar candidatos de lugar, já que quase não há vagas livres
+    para onde movê-los.
+  \item Não há custo de abertura. O objetivo é só a distância, e usar uma sala a mais nunca piora a
+    solução, então podemos dar tipo a todas as salas, mesmo que algumas fiquem vazias.
+  \item As unidades das distâncias variam. Em algumas instâncias a matriz está em graus (valores
+    perto de 0,1) e em outras em quilômetros, por isso comparamos os resultados pelo \emph{gap}
+    percentual em vez do valor absoluto.
 \end{enumerate}
 
 % =====================================================================================
@@ -198,22 +166,22 @@ orientaram as decisões:
 \subsection{Representação}
 
 Uma solução é o par $(\mathit{tipo}, \mathit{aloc})$, em que
-$\mathit{tipo}[j][r] \in \{-1\} \cup T$ é o tipo da sala $r$ da escola $j$ ($-1$: sala sem tipo)
-e $\mathit{aloc}[i] \in L$ é a escola do candidato $i$. Os tipos da escola $j$ são
-$T_j = \{\mathit{tipo}[j][r] \ge 0\}$, e a solução precisa ter $|T_j| \le K$. A partir delas,
-mantêm-se de forma incremental duas matrizes $N \times |T|$: $\mathit{cap}[j,t]$, a soma das
-capacidades das salas de tipo $t$ na escola $j$, e $\mathit{carga}[j,t]$, o número de candidatos
-do tipo $t$ alocados à escola $j$, além do custo total. A solução é viável se e somente se
-$|T_j| \le K$ e $\mathit{carga}[j,t] \le \mathit{cap}[j,t]$ para todo $(j,t)$.
+$\mathit{tipo}[j][r] \in \{-1\} \cup T$ é o tipo da sala $r$ da escola $j$ ($-1$ indica sala sem
+tipo) e $\mathit{aloc}[i] \in L$ é a escola do candidato $i$. Os tipos da escola $j$ formam o
+conjunto $T_j = \{\mathit{tipo}[j][r] \ge 0\}$, e a solução precisa ter $|T_j| \le K$. Junto com
+o par, mantemos de forma incremental o custo total e duas matrizes $N \times |T|$:
+$\mathit{cap}[j,t]$, a soma das capacidades das salas de tipo $t$ na escola $j$, e
+$\mathit{carga}[j,t]$, o número de candidatos do tipo $t$ alocados à escola $j$. A solução é
+viável se e somente se $|T_j| \le K$ e $\mathit{carga}[j,t] \le \mathit{cap}[j,t]$ para todo
+$(j,t)$.
 
-Guardar o tipo de cada sala, e não só o da escola, serve aos dois valores de $K$ com a mesma
-representação: com $K = 1$ todas as salas da escola têm o mesmo tipo; com $K = 2$ a divisão das
-salas entre os dois tipos ajusta a capacidade de cada um. A sala de cada candidato não faz parte da
-representação: ela é obtida no final, preenchendo as salas de cada par (escola, tipo) da maior para
-a menor, o que minimiza o número de salas usadas. Essa escolha separa as duas decisões do problema
-(tipos e alocação) e faz com que mover um candidato custe $O(1)$, pois só altera
-$\mathit{aloc}[i]$, duas posições de $\mathit{carga}$ e o custo. Manter a sala na representação
-não mudaria o custo de nenhuma solução e multiplicaria o número de vizinhos equivalentes.
+Guardamos o tipo de cada sala, e não só os tipos da escola, porque é a divisão das salas entre os
+dois tipos que define a capacidade de cada um. Já a sala de cada candidato fica de fora da
+representação. Ela é definida no final, enchendo as salas de cada par (escola, tipo) da maior para
+a menor, o que usa o menor número de salas. Com isso as duas decisões do problema (tipos e
+alocação) ficam separadas, e mover um candidato custa $O(1)$, pois só muda $\mathit{aloc}[i]$, duas
+posições de $\mathit{carga}$ e o custo. Guardar a sala do candidato não mudaria o custo de nenhuma
+solução e só multiplicaria o número de vizinhos equivalentes.
 
 \subsection{Função de avaliação}
 
@@ -221,36 +189,35 @@ não mudaria o custo de nenhuma solução e multiplicaria o número de vizinhos 
   f(\mathit{tipo}, \mathit{aloc}) = \sum_{i \in C} d_{i,\mathit{aloc}[i]}.
 \end{equation}
 
-\textbf{Não usamos penalização.} O construtivo só gera soluções viáveis
-(Seção~\ref{sec:construtivo}), e todo movimento da busca local é aceito apenas se preserva a
-viabilidade (Seção~\ref{sec:busca}). Assim, nenhuma restrição é violada em nenhum momento e não há
-parâmetro de penalidade a calibrar. Optamos por isso porque a estrutura do problema permite
-verificar a viabilidade de cada movimento de forma barata: um candidato que muda de escola só altera
-$\mathit{carga}$ em duas posições, e uma mudança de tipo só altera os tipos de uma ou duas escolas,
-cujo limite $|T_j| \le K$ é conferido antes de avaliar o vizinho.
+Não usamos penalização. O construtivo só gera soluções viáveis (Seção~\ref{sec:construtivo}), e a
+busca local só aceita movimentos que mantêm a viabilidade (Seção~\ref{sec:busca}), de modo que
+nenhuma restrição é violada em momento algum e não há parâmetro de penalidade para calibrar.
+Pudemos fazer assim porque checar a viabilidade de um movimento é barato neste problema: um
+candidato que muda de escola altera $\mathit{carga}$ em apenas duas posições, e uma mudança de tipo
+mexe nos tipos de uma ou duas escolas, cujo limite $|T_j| \le K$ é conferido antes de avaliar o
+vizinho.
 
-Se fosse necessário permitir soluções inviáveis (por exemplo, para trocar o tipo de uma escola
-deixando temporariamente candidatos sem lugar), a forma natural seria
-$f' = f + \rho \sum_{j,t} \max(0, \mathit{carga}[j,t] - \mathit{cap}[j,t])$, com
-$\rho > \max_{i,j} d_{ij}$: assim, levar um candidato excedente para qualquer vaga sempre compensa,
-e o ótimo de $f'$ coincide com o ótimo viável. Essa alternativa não foi necessária.
+Se precisássemos aceitar soluções inviáveis (para trocar o tipo de uma escola deixando, por um
+tempo, candidatos sem lugar, por exemplo), usaríamos
+$f' = f + \rho \sum_{j,t} \max(0, \mathit{carga}[j,t] - \mathit{cap}[j,t])$ com
+$\rho > \max_{i,j} d_{ij}$. Com esse valor de $\rho$, levar um candidato excedente para qualquer
+vaga sempre compensa, e o ótimo de $f'$ coincide com o ótimo viável.
 
-Toda solução produzida nos experimentos passa ainda por uma verificação independente, que
-recalcula $T_j$, $\mathit{cap}$, $\mathit{carga}$, a distribuição nas salas e o custo a partir do
-zero. As \nExecUm{} + \nExecDois{} soluções iniciais e finais dos dois experimentos passaram nessa
-verificação.
+Além disso, toda solução produzida nos experimentos passa por uma verificação independente, que
+recalcula do zero $T_j$, $\mathit{cap}$, $\mathit{carga}$, a distribuição nas salas e o custo. As
+soluções iniciais e finais das \nExec{} execuções passaram nessa verificação.
 
 % =====================================================================================
 \section{Heurística construtiva}\label{sec:construtivo}
 
 O construtivo tem duas fases. A fase A decide os tipos de cada escola e de cada sala e garante que
-cada tipo tenha capacidade suficiente; a fase B aloca os candidatos. A fase A é determinística; a
-fase B usa uma lista restrita de candidatos (RCL) de tamanho $k$, no estilo da fase de construção
-do GRASP \cite{feo1995}.
+cada tipo tenha capacidade suficiente; a fase B aloca os candidatos. A fase A é determinística, e a
+fase B usa uma lista restrita de candidatos (RCL) de tamanho $k$, como na fase de construção do
+GRASP \cite{feo1995}.
 
 \subsection{Fase A: tipos das escolas e das salas}
 
-A fase A segue os passos do Algoritmo~\ref{alg:faseA}:
+O Algoritmo~\ref{alg:faseA} resume a fase A.
 
 \begin{algoritmo}[htbp]
   \caption{Fase A: tipos das escolas e das salas.}\label{alg:faseA}
@@ -258,39 +225,38 @@ A fase A segue os passos do Algoritmo~\ref{alg:faseA}:
   \linha{1} $d[j,t] \gets 0$; ordena os candidatos pelo arrependimento entre as duas escolas mais próximas
   \linha{2} \textbf{para cada} candidato $i$ nessa ordem: coloca $i$ na escola mais
     próxima com vaga (capacidade $Q_j$), $d[j,\tau(i)] \gets d[j,\tau(i)] + 1$
-  \linha{3} \textbf{para cada} escola $j$: $T_j \gets$ os $K$ tipos de maior $d[j,t]$ (só os com $d[j,t] > 0$)
+  \linha{3} \textbf{para cada} escola $j$: $T_j \gets$ os dois tipos de maior $d[j,t]$ (só os com $d[j,t] > 0$)
   \linha{4} \textbf{para cada} escola $j$:
   \linha{5} \quad \textbf{enquanto} houver sala livre e $\max_{t \in T_j} (d[j,t] - \mathit{cap}[j,t]) > 0$:
   \linha{6} \quad\quad $t \gets$ esse tipo; $\phi \gets$ essa falta; $r \gets$ menor sala livre com
     $q_r \ge \phi$ (se não houver, a maior livre); $\mathit{tipo}[j][r] \gets t$
   \linha{7} \textbf{para cada} sala ainda sem tipo (maiores primeiro): recebe, entre os tipos de
-    $T_j$ (ou entre todos, se $|T_j| < K$), o de maior déficit global
+    $T_j$ (ou entre todos, se $|T_j| < 2$), o de maior déficit global
     $\delta_t = \mathit{dem}_t - \sum_j \mathit{cap}[j,t]$ ou, sem déficit, o de maior falta local
   \linha{8} \textbf{enquanto} existir $t$ com $\delta_t > 0$:
-  \linha{9} \quad candidatos: uma sala de tipo $u \ne t$ (se a escola continua com até $K$ tipos) ou
+  \linha{9} \quad candidatos: uma sala de tipo $u \ne t$ (se a escola continua com até dois tipos) ou
     todas as salas de $u$ numa escola, desde que $-\delta_u$ seja maior ou igual às vagas mudadas
   \linha{10} \quad \textbf{se} houver: muda para $t$ a da escola com maior falta local de $t$
     (empate: menos vagas mudadas)
   \linha{11} \quad \textbf{senão}: reparo exato (texto); se ele não tem solução, a instância é inviável
 \end{algoritmo}
 
-\begin{itemize}
-  \item \textbf{Critério de seleção dos locais.} Uma alocação provisória, que ignora os tipos e
-    respeita só a capacidade da escola (linhas 1--2), estima quantos candidatos de cada tipo
-    ``querem'' cada escola. Cada escola fica com os $K$ tipos de maior demanda estimada (linha 3),
-    e suas salas são dadas a esses tipos (linhas 4--6). O critério é, portanto, a
-    \emph{proximidade} entre a escola e os candidatos de cada tipo, medida pela alocação
-    provisória. Com $K = 2$, a regra \emph{best-fit} (menor sala que cobre a falta) divide as salas
-    entre os dois tipos na proporção da demanda; com $K = 1$ todas as salas recebem o mesmo tipo.
-  \item \textbf{Salas que sobram} (linha 7) recebem um tipo, pois abrir uma sala nunca piora a
-    solução e dá liberdade à fase B e à busca local.
-  \item \textbf{Cobertura} (linhas 8--11). Ao final, a capacidade de cada tipo precisa ser pelo
-    menos a sua demanda; caso contrário, a fase B travaria com candidatos sem sala. Uma sala, ou um
-    tipo inteiro de uma escola, só muda de $u$ para $t$ se o tipo $u$ continua coberto sem ela, o
-    que garante que cada troca reduz o déficit total e que o laço termina. Mudar todas as salas de
-    $u$ de uma vez é o que permite a cobertura com $K = 1$, em que uma sala sozinha não pode mudar
-    de tipo sem criar um segundo tipo na escola.
-\end{itemize}
+Para escolher os tipos de cada local, a fase A primeiro faz uma alocação provisória que ignora os
+tipos e respeita apenas a capacidade da escola (linhas 1--2). Ela serve para estimar quantos
+candidatos de cada tipo ``querem'' cada escola. Cada escola fica com os dois tipos de maior demanda
+estimada (linha 3), e suas salas são distribuídas entre eles (linhas 4--6) pela regra
+\emph{best-fit}: a menor sala que cobre a falta do tipo. O critério de seleção é, portanto, a
+proximidade entre a escola e os candidatos de cada tipo, medida pela alocação provisória, e as
+salas acabam divididas entre os dois tipos mais ou menos na proporção da demanda estimada. As salas
+que sobram também recebem um tipo (linha 7), já que abrir uma sala nunca piora a solução e dá mais
+espaço para a fase B e para a busca local.
+
+Ao fim da fase A, a capacidade de cada tipo precisa ser pelo menos igual à sua demanda; se não for,
+a fase B trava com candidatos sem sala. As linhas 8--11 tratam dessa cobertura. Uma sala, ou um
+tipo inteiro de uma escola, só passa de $u$ para $t$ se o tipo $u$ continua coberto sem ela, e
+assim cada mudança reduz o déficit total e o laço termina. Mudar todas as salas de $u$ de uma vez
+resolve o caso em que a escola já tem dois tipos, pois aí uma sala sozinha não pode ir para $t$
+sem criar um terceiro tipo na escola.
 
 \subsection{Fase B: alocação dos candidatos}
 
@@ -312,112 +278,111 @@ A fase A segue os passos do Algoritmo~\ref{alg:faseA}:
   \linha{9} \quad insere na RCL o próximo candidato ainda não considerado da $\mathit{fila}$
 \end{algoritmo}
 
-\begin{itemize}
-  \item \textbf{Ordem dos candidatos.} Decrescente de arrependimento: quem mais perde se não
-    ficar na escola mais próxima escolhe primeiro (ideia semelhante ao método de aproximação de
-    Vogel para o problema de transporte). Quem tem duas escolas próximas pode ser deslocado com
-    pouca perda e fica para o fim. O arrependimento é calculado uma única vez, o que mantém a fase
-    em $O(MN \log N)$.
-  \item \textbf{Como são alocados.} Cada candidato vai para a escola mais próxima que ainda tem
-    vaga numa sala do seu tipo, e ocupa a maior sala desse tipo com vaga.
-  \item \textbf{Capacidade.} A vaga é descontada da sala; uma escola só é aceita se a soma das
-    vagas das suas salas do tipo do candidato é positiva.
-  \item \textbf{Compatibilidade.} Só são consideradas salas com o tipo do candidato, então
-    nenhum candidato é colocado numa sala (ou escola) de outro tipo.
-  \item \textbf{Aleatoriedade.} O sorteio dentro da RCL dá diversidade às execuções. Com $k = 1$
-    o construtivo é guloso e determinístico. Usamos $k = 10$; a
-    Seção~\ref{sec:sensibilidade} avalia outros valores.
-\end{itemize}
+Os candidatos são considerados em ordem decrescente de arrependimento: quem mais perde se não
+ficar na escola mais próxima escolhe primeiro, numa ideia parecida com a do método de aproximação
+de Vogel para o problema de transporte. Quem tem duas escolas próximas perde pouco se for
+deslocado e fica para o fim. O arrependimento é calculado uma única vez, o que mantém a fase em
+$O(MN \log N)$.
+
+Cada candidato vai para a escola mais próxima que ainda tem vaga numa sala do seu tipo e ocupa a
+maior sala desse tipo com vaga. A capacidade é controlada sala a sala: a vaga é descontada da sala,
+e uma escola só é aceita se as suas salas do tipo do candidato ainda têm vaga somada positiva. A
+compatibilidade vem do fato de que só entram na busca salas do tipo do candidato, então ninguém é
+colocado numa sala de outro tipo.
+
+O sorteio dentro da RCL dá diversidade às execuções. Com $k = 1$ o construtivo é guloso e
+determinístico; usamos $k = 10$, e a Seção~\ref{sec:sensibilidade} testa outros valores.
 
 \subsection{Escolhas atrativas que travam a construção}\label{sec:trava}
 
-Uma construção puramente gulosa trava com facilidade neste problema: se cada escola recebe os tipos
-de maior demanda local, os tipos com poucos candidatos espalhados (como M3s nas instâncias pequenas)
-podem não ser escolhidos por escola nenhuma, ou ficar com menos vagas que candidatos, e os últimos
-candidatos desses tipos ficariam sem lugar. Por isso a fase A trata a cobertura \emph{antes} de
-alocar: ao final dela, $\sum_j \mathit{cap}[j,t] \ge \mathit{dem}_t$ para todo $t$. Como o vetor
-$\mathit{pref}_i$ contém todas as escolas, a fase B sempre encontra uma sala do tipo do candidato
-com vaga, qualquer que seja a ordem dos sorteios.
+Uma construção puramente gulosa trava com facilidade neste problema. Se cada escola recebe os tipos
+de maior demanda local, um tipo com poucos candidatos espalhados (como M3s nas instâncias pequenas)
+pode não ser escolhido por escola nenhuma, ou ficar com menos vagas que candidatos, e os últimos
+candidatos desse tipo ficariam sem lugar. Por isso a fase A resolve a cobertura antes de alocar:
+quando ela termina, $\sum_j \mathit{cap}[j,t] \ge \mathit{dem}_t$ para todo $t$. Como
+$\mathit{pref}_i$ contém todas as escolas, a fase B sempre acha uma sala do tipo do candidato com
+vaga, seja qual for a ordem dos sorteios.
 
-Mesmo a cobertura gulosa (linhas 8--10) pode travar. Com $K = 1$, cobrir os tipos é um problema
-de cobertura de \emph{bins}: cada escola inteira vai para um tipo, e pode acontecer que nenhuma
-escola possa mudar de tipo sem descobrir o tipo que ela atendia, embora outra distribuição dos tipos
-entre as escolas cubra todos. Nesse caso a fase A recorre a um \textbf{reparo exato} (linha 11):
-um modelo inteiro pequeno, só com as salas e os tipos (sem candidatos e sem distâncias), que muda o
-tipo do menor total de vagas possível em relação à atribuição atual, respeitando
-as restrições~\eqref{eq:umtipo}--\eqref{eq:k} e a cobertura $\sum_j \mathit{cap}[j,t] \ge \mathit{dem}_t$. Ele
-tem algumas centenas de variáveis binárias e é resolvido pelo HiGHS \cite{huangfu2018} em frações
-de segundo. Optamos por ele porque o problema que ele resolve é só de viabilidade, e a decisão
-guiada por distância continua sendo a da heurística: o reparo preserva tudo o que a fase A decidiu e
-muda apenas o necessário. Ele tem ainda uma vantagem: quando o modelo não tem solução, a instância
-é comprovadamente inviável, e o método o informa sem gastar tempo de busca. Com $K = 1$ o reparo foi
-necessário em \reparoInstUm{} das \nInstUm{} instâncias; com $K = 2$, em \reparoInstDois{}
-(\reparoIdsDois).
+A própria cobertura gulosa (linhas 8--10) também pode travar. Com salas indivisíveis e no máximo
+dois tipos por escola, pode acontecer de nenhuma sala, e nenhum tipo inteiro de uma escola, poder
+mudar sem descobrir o tipo que atendia, mesmo que outra distribuição dos tipos entre as salas
+cubra todos. Para esse caso a fase A tem um reparo exato (linha 11). É um modelo inteiro pequeno,
+só com salas e tipos (sem candidatos e sem distâncias), que muda o tipo do menor total de vagas
+possível em relação à atribuição atual, respeitando as restrições~\eqref{eq:umtipo}--\eqref{eq:k}
+e a cobertura $\sum_j \mathit{cap}[j,t] \ge \mathit{dem}_t$. O modelo tem algumas centenas de
+variáveis binárias, e o HiGHS \cite{huangfu2018} o resolve em frações de segundo. Escolhemos esse
+caminho porque o reparo só resolve a viabilidade: ele preserva o que a fase A decidiu e muda apenas
+o necessário, e quem continua decidindo com base na distância é a heurística. Quando o modelo não
+tem solução, temos uma prova de que a instância é inviável, e o método avisa sem gastar tempo de
+busca. A cobertura gulosa mudou o tipo de alguma sala em \coberturaInst{} das \nInst{} instâncias
+viáveis, e o reparo exato foi necessário em \reparoInst{} delas (\reparoIds).
 
 % =====================================================================================
 \section{Estruturas de vizinhança e busca local}\label{sec:busca}
 
 \subsection{Vizinhanças}
 
-As vizinhanças foram escolhidas a partir da representação e das propriedades da
-Seção~\ref{sec:instancias}. Como a folga é pequena, quase toda escola está cheia, e mover um
-candidato sozinho raramente é possível: é preciso \emph{trocar} candidatos ou \emph{encadear}
-movimentos. Como a representação separa os tipos da alocação, há vizinhanças para cada nível, e as
-de tipos foram desenhadas para os dois valores de $K$.
+Escolhemos as vizinhanças a partir da representação e das propriedades da
+Seção~\ref{sec:instancias}. Com folga pequena, quase toda escola está cheia e raramente dá para
+mover um candidato sozinho, então precisamos trocar candidatos ou encadear movimentos. E, como a
+representação separa os tipos da alocação, há vizinhanças para cada uma dessas decisões.
 
-\textbf{Vizinhanças de alocação} (os tipos não mudam):
+As três primeiras vizinhanças mexem só na alocação e mantêm os tipos:
 \begin{description}
-  \item[N1 (shift).] Move um candidato para outra escola que tenha vaga numa sala do seu tipo.
-    Avaliação em $O(1)$; uma passada completa custa $O(MN)$. É a vizinhança mais simples e
-    aproveita as vagas que sobram após as outras vizinhanças.
-  \item[N2 (swap).] Troca dois candidatos do mesmo tipo entre as escolas $j$ e $k$. A carga não
-    muda, então a troca é sempre viável e é a vizinhança natural para escolas cheias. A melhor
-    troca de um par $(j,k)$ sai em $O(|I_j| + |I_k|)$:
+  \item[N1 (shift).] Move um candidato para outra escola que tenha vaga numa sala do seu tipo. Cada
+    vizinho é avaliado em $O(1)$, e uma passada completa custa $O(MN)$. É a vizinhança mais
+    simples e aproveita as vagas que as outras vizinhanças deixam livres.
+  \item[N2 (swap).] Troca dois candidatos do mesmo tipo entre as escolas $j$ e $k$. Como a carga
+    não muda, a troca é sempre viável, o que a torna a vizinhança natural para escolas cheias. A
+    melhor troca de um par $(j,k)$ sai em $O(|I_j| + |I_k|)$, como
     $\min_{a \in I_j} (d_{ak} - d_{aj}) + \min_{b \in I_k} (d_{bj} - d_{bk})$.
-  \item[N3 (cadeias de ejeção).] Generaliza N1 e N2 \cite{glover1996}: o candidato $i_1$ vai de
+  \item[N3 (cadeias de ejeção).] Generaliza N1 e N2 \cite{glover1996}. O candidato $i_1$ vai de
     $j_1$ para $j_2$, $i_2$ de $j_2$ para $j_3$, e assim por diante, até voltar a $j_1$ ou chegar a
-    uma escola com vaga. Para cada tipo $t$, monta-se um grafo cujos nós são as escolas com sala
-    do tipo $t$ e um nó auxiliar $S$; o arco $j \to k$ tem custo
+    uma escola com vaga. Para cada tipo $t$ montamos um grafo cujos nós são as escolas com sala do
+    tipo $t$ e um nó auxiliar $S$, em que o arco $j \to k$ custa
     $\min_{i \in (j,t)} (d_{ik} - d_{ij})$. Um ciclo de custo negativo, encontrado por
-    Bellman-Ford em $O(N^3)$, é uma cadeia de realocações que melhora $f$. Quando não há ciclo
-    negativo, a alocação é ótima para os tipos atuais, pela condição de otimalidade do
+    Bellman-Ford em $O(N^3)$, corresponde a uma cadeia de realocações que melhora $f$. Se não há
+    ciclo negativo, a alocação é ótima para os tipos atuais, pela condição de otimalidade do
     problema de transporte \cite{ahuja1993}.
 \end{description}
 
-\textbf{Vizinhanças de tipos} (só geram vizinhos com $|T_j| \le K$):
+As outras quatro mudam tipos, e só geram vizinhos com $|T_j| \le 2$:
 \begin{description}
-  \item[N4 (retipar sala).] Muda o tipo de uma sala de $u$ para $t$. Só é permitido se a escola
-    continua com até $K$ tipos: $t$ já está na escola, a sala é a única de $u$, ou $|T_j| < K$. Com
-    $K = 1$ só atua em escolas de uma sala.
-  \item[N5 (trocar salas).] Troca os tipos de duas salas da mesma escola com tipos diferentes
-    $u \ne t$ e capacidades $q_1 > q_2$. O efeito é transferir $q_1 - q_2$ vagas de $u$ para $t$
-    naquela escola, sem mudar $T_j$: um ajuste fino da divisão entre os dois tipos de uma escola,
-    que só existe com $K = 2$.
-  \item[N6 (tipo da escola).] Todas as salas do tipo $u$ na escola $j$ passam para o tipo $t$: a
-    escola troca um dos seus tipos. Com $K = 1$ é a mudança do tipo da escola.
+  \item[N4 (retipar sala).] Muda o tipo de uma sala de $u$ para $t$. O movimento só é permitido se
+    a escola continua com até dois tipos, isto é, se $t$ já está na escola, se a sala é a única de
+    $u$ ou se a escola tem um só tipo. Numa escola que já tem dois tipos, ele passa uma sala de um
+    tipo para o outro.
+  \item[N5 (trocar salas).] Troca os tipos de duas salas da mesma escola, de tipos $u \ne t$ e
+    capacidades $q_1 > q_2$. Com isso $q_1 - q_2$ vagas passam de $u$ para $t$ naquela escola, sem
+    mudar $T_j$. É um ajuste fino da divisão entre os dois tipos da escola, útil quando tirar uma
+    sala inteira de $u$ com N4 deixaria esse tipo sem vagas suficientes.
+  \item[N6 (tipo da escola).] Todas as salas do tipo $u$ na escola $j$ passam para o tipo $t$, ou
+    seja, a escola troca um dos seus tipos.
   \item[N7 (trocar escolas).] As escolas $j$ e $k$ trocam um tipo: as salas de $u$ em $j$ passam
-    para $t$ e as de $t$ em $k$ passam para $u$. A capacidade total de cada tipo quase não muda, o
-    que permite reorganizar os tipos mesmo quando nenhum tipo tem sobra para perder uma escola
-    inteira, situação comum com $K = 1$ (Seção~\ref{sec:instancias}, propriedade 2). Custa
-    $O(N^2 K^2)$ vizinhos por passada.
+    para $t$, e as de $t$ em $k$ passam para $u$. Como a capacidade total de cada tipo quase não
+    muda, dá para reorganizar os tipos mesmo quando nenhum tipo tem sobra para perder um conjunto
+    de salas, o que é comum com a cobertura justa (Seção~\ref{sec:instancias}, propriedade 2). Há
+    $O(N^2)$ vizinhos por passada, já que cada escola tem no máximo dois tipos.
 \end{description}
 
-Todas as vizinhanças de tipos alteram $\mathit{cap}$ em algumas células (escola, tipo) e são
-avaliadas da mesma forma: (i) \emph{chegadas}: nas células que ganham vagas, os candidatos daquele
-tipo em outras escolas com maior ganho $d_{i,\mathit{aloc}[i]} - d_{ij} > 0$, até ocupar as vagas
-livres; (ii) \emph{despejos}: nas células que perdem vagas, o excedente sai, cada um para a escola
-mais próxima com vaga do seu tipo, começando pelos que perdem menos. O vizinho é aceito se
-$\Delta = \text{custo dos despejos} - \text{ganho das chegadas} < 0$ e é descartado se não houver
-vagas para todos os despejos, o que preserva a viabilidade. Salas iguais (mesma capacidade e mesmo
-tipo) geram o mesmo vizinho e são avaliadas uma vez só.
+Todas as vizinhanças de tipos alteram $\mathit{cap}$ em algumas células (escola, tipo), e todas
+são avaliadas do mesmo jeito. Primeiro vêm as chegadas: nas células que ganham vagas, entram os
+candidatos daquele tipo, alocados em outras escolas, que mais ganham com a mudança
+($d_{i,\mathit{aloc}[i]} - d_{ij} > 0$), até ocupar as vagas livres. Depois vêm os despejos: nas
+células que perdem vagas, o excedente sai, começando por quem perde menos, e cada um vai para a
+escola mais próxima com vaga do seu tipo. O vizinho é aceito se
+$\Delta = \text{custo dos despejos} - \text{ganho das chegadas} < 0$ e descartado se faltar vaga
+para algum despejo, o que mantém a viabilidade. Salas iguais (mesma capacidade e mesmo tipo) geram
+o mesmo vizinho e são avaliadas uma vez só.
 
 \subsection{Estratégia de busca: VND}
 
 As vizinhanças são combinadas numa descida em vizinhança variável (VND) \cite{mladenovic1997}, na
-ordem N1 a N7 (Algoritmo~\ref{alg:vnd}): das mais baratas e locais para as mais caras e
-estruturais. N1, N2 e N3 são aplicadas até o ótimo local da vizinhança; N4 a N7 aplicam o primeiro
-movimento de melhora (\emph{first improvement}), porque cada mudança de tipo altera as capacidades
-e exige reotimizar a alocação, o que é feito ao voltar para N1.
+ordem N1 a N7 (Algoritmo~\ref{alg:vnd}), das mais baratas e locais para as mais caras e que mudam
+mais a estrutura da solução. N1, N2 e N3 são aplicadas até chegar ao ótimo local da vizinhança. Em
+N4 a N7 aplicamos o primeiro movimento que melhora (\emph{first improvement}), porque cada mudança
+de tipo altera as capacidades e pede uma nova otimização da alocação, que é feita ao voltar
+para N1.
 
 \begin{algoritmo}[htbp]
   \caption{VND.}\label{alg:vnd}
@@ -433,83 +398,63 @@ e exige reotimizar a alocação, o que é feito ao voltar para N1.
 % =====================================================================================
 \section{Metodologia experimental}\label{sec:experimentos}
 
-\textbf{Ambiente.} Python 3.13.5 com NumPy 2.5.4, num Apple M1 Max com 32~GB de memória (macOS
-26.6), em uma única \emph{thread}. O código e as instruções para reproduzir os experimentos
-acompanham este relatório (\texttt{src/experimentos.py}).
+Os experimentos rodaram em Python 3.13.5 com NumPy 2.5.4, num Apple M1 Max com 32~GB de memória
+(macOS 26.6), em uma única \emph{thread}. O código e as instruções para reproduzi-los estão no
+repositório \url{https://github.com/Bersan121/Alocacao_candidatos_PISM.git}
+(\texttt{src/experimentos.py -t 2}).
 
-\textbf{Protocolo.} Cada instância foi resolvida 10 vezes com $k = 10$, usando as sementes 0 a 9.
-Para cada execução registramos: valor da solução inicial, valor após o VND, melhoria absoluta e
-percentual, tempo do construtivo e da busca, número de escolas e de salas utilizadas, e o número de
-movimentos e o ganho de cada vizinhança. Para cada instância relatamos média, desvio padrão, melhor
-e pior valor das 10 execuções, como pede o enunciado para métodos com componentes aleatórios. O
-experimento completo foi feito duas vezes: com no máximo um tipo de prova por escola
-(\texttt{-{}-tipos-por-escola 1}, a configuração principal, \nInstUm{} instâncias viáveis e
-\nExecUm{} execuções) e com até dois (\texttt{-{}-tipos-por-escola 2}, \nInstDois{} instâncias
-viáveis e \nExecDois{} execuções).
+Cada instância foi resolvida 10 vezes com $k = 10$, com as sementes 0 a 9. Em cada execução
+registramos o valor da solução inicial e o valor após o VND, a melhoria absoluta e percentual, o
+tempo do construtivo e da busca, o número de escolas e de salas usadas, e o número de movimentos e o
+ganho de cada vizinhança. Como o método tem componentes aleatórios, relatamos para cada instância
+a média, o desvio padrão, o melhor e o pior valor das 10 execuções, como pede o enunciado. Ao todo
+são \nInst{} instâncias viáveis e \nExec{} execuções.
 
-\textbf{Valores de referência.} Para medir a qualidade, resolvemos o
-modelo~\eqref{eq:obj}--\eqref{eq:cap} para cada $K$ com o HiGHS \cite{huangfu2018}, via SciPy
-\cite{virtanen2020}, com limite de 60~s por instância e por $K$ (com $K = 1$, na forma por escola;
-com $K = 2$, com as salas iguais de cada escola agregadas para reduzir a simetria). O MIP prova o
-ótimo em \refOtimaUm{} das \nInstUm{} instâncias com $K = 1$ e em \refOtimaDois{} das \nInstDois{}
-com $K = 2$; com $K = 1$, em \semMipUm{} instâncias grandes ele não encontra nenhuma solução em
-60~s. Por isso, para $K = 1$, rodamos também uma \emph{busca exata nos tipos}: partindo dos tipos da
-melhor solução da heurística, muda o tipo de uma escola ou troca os tipos de duas (as mesmas
-vizinhanças N6 e N7), mas avalia cada vizinho pela alocação ótima, resolvida como problema de
-transporte, com limite de 120~s por instância. Ela é cara demais para ser parte da heurística
-(cada avaliação resolve um programa linear), mas dá uma referência melhor e mede o que a avaliação
-gulosa de N6 e N7 deixa de ganhar. Nas instâncias sem ótimo provado, usamos o \emph{melhor valor
-conhecido} (o menor entre o MIP, a nossa heurística, uma alocação ótima com os tipos do construtivo
-e, para $K = 1$, a busca exata nos tipos) e um \emph{limite inferior} (LB): o
-maior entre o limite do MIP e a relaxação em que a capacidade da escola é compartilhada livremente
-entre os tipos, que se resolve como um problema de transporte e vale para os dois valores de $K$.
-O \emph{gap} de um valor $v$ é $100\,(v - v^\star)/v^\star$, sendo $v^\star$ a referência. Quando
-a referência é o melhor valor conhecido e a heurística o encontrou, o gap é zero mesmo sem prova de
-otimalidade; por isso também reportamos o gap até o LB, que é uma garantia.
+Para medir a qualidade, resolvemos o modelo~\eqref{eq:obj}--\eqref{eq:cap} com o HiGHS
+\cite{huangfu2018}, via SciPy \cite{virtanen2020}, com limite de 60~s por instância e com as salas
+iguais de cada escola agregadas para reduzir a simetria. O MIP prova o ótimo em \refOtima{} das
+\nInst{} instâncias e, em \semMip{} instância grande, não encontra nenhuma solução em 60~s. Nas
+instâncias sem ótimo provado usamos duas referências. Uma é o melhor valor conhecido, o menor entre
+o MIP, a nossa heurística e uma alocação ótima com os tipos do construtivo. A outra é um limite
+inferior (LB), o maior entre o limite do MIP e uma relaxação em que a capacidade da escola é
+compartilhada livremente entre os tipos, que se resolve como um problema de transporte. O
+\emph{gap} de um valor $v$ é $100\,(v - v^\star)/v^\star$, sendo $v^\star$ a referência. Quando a
+referência é o melhor valor conhecido e foi a própria heurística que o encontrou, o gap dá zero
+mesmo sem prova de otimalidade. Por isso reportamos também o gap até o LB, que é uma garantia.
 
 % =====================================================================================
 \section{Resultados}\label{sec:resultados}
 
 \subsection{Solução inicial e após a busca local}
 
-As Tabelas~\ref{tab:resultados} e~\ref{tab:qualidade} trazem os resultados por instância e a
-Figura~\ref{fig:gaps} resume a qualidade, para os dois valores de $K$.
+As Tabelas~\ref{tab:resultados} e~\ref{tab:qualidade} trazem os resultados por instância, e a
+Figura~\ref{fig:gaps} resume a qualidade. O construtivo fica, em média, \gapIni\% acima do melhor
+valor conhecido. O VND melhora a solução inicial em \melhoria\%, em média, e termina \gapFin\%
+acima do melhor valor conhecido. Em \abaixoUm{} das \nInst{} instâncias o resultado final fica a
+menos de 1\% da referência, e só \acimaCinco{} fica 5\% ou mais acima.
 
-\begin{itemize}
-  \item \textbf{Construtivo:} fica, em média, \gapIniUm\% acima do melhor valor conhecido com
-    $K = 1$ e \gapIniDois\% com $K = 2$.
-  \item \textbf{Após o VND, com $K = 1$:} a distância cai para \gapFinUm\% (\gapLbUm\% acima do
-    limite inferior), uma melhoria média de \melhoriaUm\% sobre a solução inicial. Em \abaixoUmUm{}
-    das \nInstUm{} instâncias o resultado final fica a menos de 1\% do melhor valor conhecido, e
-    nas \refOtimaUm{} instâncias com ótimo provado o VND o alcança em \otimosUm; \acimaCincoUm{}
-    ficam 5\% ou mais acima. A heurística supera o MIP de 60~s em \melhorQueMipUm{} instâncias e é
-    ela mesma a referência, sem prova de otimalidade, em \refHeurUm. O gap até o LB é alto
-    (\gapLbUm\% em média) porque, com um tipo por escola, o LB de transporte, que ignora os tipos,
-    é fraco, e o limite do MIP de 60~s pouco o melhora: ele não mede a distância ao ótimo, mas
-    serve de garantia.
-  \item \textbf{Após o VND, com $K = 2$:} \gapFinDois\% acima do melhor conhecido (\gapLbDois\%
-    acima do LB), com melhoria média de \melhoriaDois\%; \abaixoUmDois{} das \nInstDois{}
-    instâncias ficam a menos de 1\% da referência. Esse gap pequeno deve ser lido com cuidado:
-    com $K = 2$ o MIP de 60~s fica pior que a heurística em \melhorQueMipDois{} instâncias, e a
-    própria heurística é a referência em \refHeurDois. O gap até o LB, que aqui é mais apertado
-    (\gapLbDois\% em média), é a medida mais confiável.
-  \item \textbf{Casos ruins:} com $K = 1$, os maiores gaps são \piorUmGapUm\% (\piorUmIdUm),
-    \piorDoisGapUm\% (\piorDoisIdUm) e \piorTresGapUm\% (\piorTresIdUm); a
-    Seção~\ref{sec:ruim} analisa esses casos.
-\end{itemize}
+Esse gap médio precisa ser lido com cuidado. A heurística encontra soluções melhores que o MIP de
+60~s em \melhorQueMip{} instâncias e, em \refHeur{} delas, ela mesma é a referência, sem prova de
+otimalidade, o que zera o gap. Nas \refOtima{} instâncias com ótimo provado, o VND chega ao ótimo
+em \otimos{} e fica, no pior caso, \piorUmGap\% acima dele (\piorUmId; ver
+Seção~\ref{sec:ruim}).
+
+O gap até o LB é uma garantia: \gapLb\% em média, com mediana de \gapLbMediana\%. A média sobe por
+causa de \lbFracoIds{} (\lbFracoGaps\%). Nelas o MIP não melhora o LB de transporte, que ignora os
+tipos e fica fraco. Sem essas duas instâncias, a média cai para \gapLbSemFracos\%.
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figuras/gaps.png}
   \caption{Gap até o melhor valor conhecido da solução inicial (média de 10 execuções) e da
-    solução após o VND, por instância, com um e com até dois tipos por escola.}
+    melhor solução após o VND, por instância.}
   \label{fig:gaps}
 \end{figure}
 
 \begin{table}[htbp]
   \centering
-  \caption{Um tipo por escola: valor da solução inicial (construtivo) e após o VND nas 10
-    execuções (média, desvio padrão, melhor e pior).}
+  \caption{Valor da solução inicial (construtivo) e após o VND nas 10 execuções (média, desvio
+    padrão, melhor e pior).}
   \label{tab:resultados}
   \scriptsize
   \input{tabelas/resultados.tex}
@@ -518,37 +463,33 @@ Figura~\ref{fig:gaps} resume a qualidade, para os dois valores de $K$.
 \begin{table}[htbp]
   \centering
   \caption{Melhoria média da busca local, gaps da solução inicial (média) e final (melhor execução)
-    até a referência, gap final até o limite inferior e tempo médio por execução ($t$), com um e
-    com até dois tipos por escola. $^*$: referência com otimalidade provada.}
+    até a referência, gap final até o limite inferior, tempo médio por execução ($t$) e escolas
+    com dois tipos e usadas na melhor solução. $^*$: referência com otimalidade provada.}
   \label{tab:qualidade}
   \scriptsize
-  \setlength{\tabcolsep}{4pt}
   \input{tabelas/qualidade.tex}
 \end{table}
 
 \subsection{Contribuição de cada vizinhança}
 
 A Tabela~\ref{tab:vizinhancas} e a Figura~\ref{fig:vizinhancas} mostram quanto cada vizinhança
-contribui. A N2 (swap) responde pela maior parte da melhoria nos dois casos
-(\partNDoisUm\% com $K = 1$ e \partNDoisDois\% com $K = 2$), o que confirma a escolha motivada pela
+contribui. A N2 (swap) responde pela maior parte da melhoria (\partNDois\%), como esperávamos pela
 folga pequena: com as escolas cheias, o ganho vem de trocar candidatos. A N1 quase não atua logo
-após o construtivo, pois a fase B já coloca cada candidato na escola mais próxima com vaga; ela volta
-a ser útil depois das mudanças de tipo, que abrem vagas novas. A N3 tem contribuição pequena em
-valor, mas é ela que garante que a alocação final é ótima para os tipos encontrados.
+depois do construtivo, porque a fase B já põe cada candidato na escola mais próxima com vaga, mas
+volta a ser útil depois das mudanças de tipo, que abrem vagas novas. A N3 contribui pouco em valor
+(\partNTres\%), mas é ela que garante que a alocação final é ótima para os tipos encontrados.
 
-As vizinhanças de tipos se comportam de forma muito diferente nos dois casos, como previsto ao
-projetá-las. Com $K = 1$, N4 e N5 não atuam (todas as escolas têm mais de uma sala, e só há um tipo
-por escola), N6 atua pouco (\partNSeisUm\%), porque a cobertura justa raramente permite que uma
-escola inteira mude de tipo sozinha, e \textbf{N7 é a segunda vizinhança mais importante}
-(\partNSeteUm\% da melhoria): trocar os tipos de duas escolas mantém a cobertura quase intacta. Com
-$K = 2$, a escola tem duas partes ajustáveis e N4 passa a ser a segunda mais importante
-(\partNQuatroDois\%), seguida de N7 (\partNSeteDois\%).
+Entre as vizinhanças de tipos, a N4 é a mais importante e a segunda no geral (\partNQuatro\%).
+Passar uma sala de um tipo para o outro dentro da escola corrige a divisão de vagas que a fase A
+fez a partir de uma demanda só estimada. Depois vem a N7 (\partNSete\%), que troca tipos entre
+escolas sem desfazer a cobertura. N5 e N6 contribuem pouco (\partNCinco\% e \partNSeis\%), mas
+fazem movimentos que as outras não fazem: a N5 move menos vagas que uma sala inteira, e a N6 troca
+um tipo inteiro da escola quando ele tem sobra.
 
 \begin{table}[htbp]
   \centering
   \caption{Movimentos aplicados por execução, ganho por execução (em \% do valor inicial) e
-    participação de cada vizinhança na melhoria total (médias por instância), com um e com até
-    dois tipos por escola.}
+    participação de cada vizinhança na melhoria total (médias por instância).}
   \label{tab:vizinhancas}
   \small
   \input{tabelas/vizinhancas.tex}
@@ -557,22 +498,18 @@ $K = 2$, a escola tem duas partes ajustáveis e N4 passa a ser a segunda mais im
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figuras/vizinhancas.png}
-  \caption{Participação de cada vizinhança na melhoria obtida pelo VND, com um e com até dois tipos
-    por escola.}
+  \caption{Participação de cada vizinhança na melhoria obtida pelo VND.}
   \label{fig:vizinhancas}
 \end{figure}
 
 \subsection{Tempo de execução}
 
-O construtivo leva no máximo \tConstrMaxUm~s com $K = 1$ e \tConstrMaxDois~s com
-$K = 2$ (incluindo o reparo exato, quando usado). O tempo total (Figura~\ref{fig:tempo}) é dominado
-pelo VND: com $K = 1$, \tempoMedioUm~s em média e \tempoMaxUm~s no caso mais lento
-(\tempoMaxIdUm); com $K = 2$, \tempoMedioDois~s em média e \tempoMaxDois~s no máximo
-(\tempoMaxIdDois). O tempo cresce com o número de candidatos (correlação de \corrTempoMUm{} e
-\corrTempoMDois{} entre o tempo da busca e $M$, por execução), mas acompanha ainda mais o número de
-mudanças de tipo aceitas em N4 a N7 (\corrTempoTiposUm{} e \corrTempoTiposDois), porque cada
-mudança aceita reinicia a VND em N1, que volta a percorrer todos os candidatos. Com $K = 2$ há mais
-mudanças de tipo possíveis e aceitas, o que explica o tempo cinco vezes maior.
+O construtivo leva no máximo \tConstrMax~s, já contando o reparo exato quando ele é usado. O tempo
+total (Figura~\ref{fig:tempo}) vem quase todo do VND: \tempoMedio~s em média e \tempoMax~s na
+instância mais lenta (\tempoMaxId). O tempo da busca cresce com o número de candidatos (correlação
+de \corrTempoM{} com $M$, por execução), mas acompanha mais de perto o número de mudanças de tipo
+aceitas em N4 a N7 (correlação de \corrTempoTipos). Cada mudança aceita reinicia a VND em N1, que
+volta a percorrer todos os candidatos.
 
 \begin{figure}[htbp]
   \centering
@@ -584,14 +521,13 @@ mudanças de tipo possíveis e aceitas, o que explica o tempo cinco vezes maior.
 \subsection{Variabilidade}
 
 A Figura~\ref{fig:variabilidade} mostra o desvio de cada execução em relação à média da
-instância. O construtivo varia pouco (coeficiente de variação médio de \cvIniUm\% com $K = 1$,
-máximo de \cvIniMaxUm\%), e o VND termina \textbf{no mesmo valor} nas 10 execuções de todas as
-instâncias com $K = 1$; com $K = 2$, só \nVariaFinDois{} instância tem alguma variação no valor final
-(CV de \cvFinMaxDois\%). Isso indica que a aleatoriedade da fase B altera apenas a ordem de
-candidatos com arrependimentos parecidos, e o VND corrige essas diferenças, porque os tipos (a
-decisão que de fato define o ótimo local) vêm da fase A, que é determinística. O resultado final é,
-portanto, robusto à semente; em contrapartida, a RCL da fase B não gera diversidade suficiente para
-escapar do ótimo local, o que motiva as melhorias da Seção~\ref{sec:conclusao}.
+instância. O construtivo varia pouco, com coeficiente de variação médio de \cvIni\% (máximo de
+\cvIniMax\%). Depois do VND, as 10 execuções terminam no mesmo valor em todas as instâncias menos
+\nVariaFin{} (\variaFinIds, com CV de \cvFinMax\%). A aleatoriedade da fase B só muda a ordem de
+candidatos com arrependimentos parecidos, e o VND desfaz essas diferenças, porque os tipos, que são
+o que de fato define o ótimo local, vêm da fase A, que é determinística. O resultado final quase
+não depende da semente. Em compensação, a RCL da fase B não gera diversidade suficiente para sair
+do ótimo local, o que motiva algumas das melhorias da Seção~\ref{sec:conclusao}.
 
 \begin{figure}[htbp]
   \centering
@@ -603,233 +539,165 @@ escapar do ótimo local, o que motiva as melhorias da Seção~\ref{sec:conclusao
 
 \subsection{Sensibilidade ao tamanho da RCL}\label{sec:sensibilidade}
 
-Para escolher o tamanho da RCL, repetimos o experimento com $K = 1$ para $k \in \{1, 5, 25, 50\}$
-(com $k = 1$, uma única execução, pois o construtivo é determinístico). A
-Tabela~\ref{tab:sensibilidade} mostra a média, sobre as instâncias, do gap da solução
-inicial e da final e do coeficiente de variação (CV) entre as 10 execuções.
+Para escolher o tamanho da RCL, repetimos o experimento com $k \in \{1, 5, 25, 50\}$. Com $k = 1$
+fizemos uma única execução, já que o construtivo é determinístico. A
+Tabela~\ref{tab:sensibilidade} mostra, em média sobre as instâncias, o gap da solução inicial e da
+final e o coeficiente de variação (CV) entre as 10 execuções.
 
 \begin{table}[htbp]
   \centering
-  \caption{Sensibilidade ao tamanho da RCL ($K = 1$): gaps médios e coeficiente de variação
-    médio entre execuções.}
+  \caption{Sensibilidade ao tamanho da RCL: gaps médios e coeficiente de variação médio entre
+    execuções.}
   \label{tab:sensibilidade}
   \scriptsize
   \input{tabelas/sensibilidade_k.tex}
 \end{table}
 
-Aumentar $k$ aumenta a dispersão do construtivo e piora ligeiramente a solução inicial média,
-como esperado ao sortear entre candidatos com arrependimento menor. Mas \textbf{o valor final é
-idêntico para todo $k$}: o VND converge para o mesmo ótimo local, e o tempo não muda. Mantivemos
-$k = 10$ como padrão porque gera variação mensurável entre execuções sem degradar a solução inicial.
-O experimento mostra, porém, que a diversidade necessária para melhorar o resultado final não virá
-da RCL da fase B, e sim de perturbações nos tipos das escolas (Seção~\ref{sec:conclusao}).
+Um $k$ maior espalha mais as soluções do construtivo (o CV inicial vai de zero com $k = 1$ a cerca
+de 0,13\% com $k = 50$), mas quase não muda a solução inicial média, porque o sorteio só troca a
+ordem de candidatos com arrependimentos parecidos. O valor final é praticamente o mesmo para todo
+$k$, com diferenças só na terceira casa decimal do gap, e o tempo também não muda: o VND converge
+para o mesmo ótimo local. Mantivemos $k = 10$ porque ele já gera variação mensurável entre as
+execuções sem piorar a solução inicial. Para melhorar o resultado final, a diversidade terá de vir
+de perturbações nos tipos das escolas (Seção~\ref{sec:conclusao}), já que a RCL da fase B não a
+produz.
 
 \subsection{Informações da solução: locais utilizados e distribuição}
 
 Como não há custo de abertura e a folga é pequena, todas as escolas são usadas em todas as
-instâncias com $K = 1$; com $K = 2$, só uma instância (I20, a de maior folga) deixa uma escola
-fechada (Tabela~\ref{tab:tipos-por-escola}). A Figura~\ref{fig:distribuicao} e a
-Tabela~\ref{tab:distribuicao} mostram a distribuição dos candidatos na melhor solução da instância
-do grupo \idGrupo{} (5917 candidatos, 20 escolas, 197 salas). Com $K = 1$, cada tipo fica com três
-ou quatro escolas, e a folga se concentra nas escolas do tipo com mais sobra (E1, M3d, usa só 52\%
-da capacidade). Com $K = 2$ todas as 20 escolas oferecem dois tipos, cada tipo aparece em seis a
-oito escolas, e quase todas as escolas ficam cheias; ainda assim a distância total cai só
-\reducaoGrupo\%, porque nessa instância a solução com um tipo já fica perto do LB
-(Tabela~\ref{tab:tipos-por-escola}).
+instâncias, menos em \fechouIds{}, a de maior folga, que deixa uma escola fechada
+(Tabela~\ref{tab:qualidade}). O segundo tipo é usado quase sempre. Na melhor solução, em média
+\duasMedia\% das escolas oferecem dois tipos (de \duasMin\% a \duasMax\% por instância), e em
+\nTodasDuas{} instâncias todas oferecem dois. Isso acontece porque o modelo não cobra nada por um
+segundo tipo, e a heurística o abre sempre que isso reduz a distância. Se na prática um segundo
+tipo tiver custo (mais coordenadores, mais malotes de provas), basta acrescentar à função objetivo
+uma penalidade por escola com dois tipos.
+
+A Figura~\ref{fig:distribuicao} e a Tabela~\ref{tab:distribuicao} mostram como os candidatos se
+distribuem na melhor solução da instância do grupo, \idGrupo{} (5917 candidatos, 20 escolas e 197
+salas), que fica \gapGrupo\% acima do melhor valor conhecido. As 20 escolas oferecem dois tipos, e
+cada tipo aparece em seis a oito escolas. Catorze escolas ficam cheias. A folga fica concentrada em
+E1 e E12 (52\% e 63\% de ocupação), cujas salas de M3e e M3d sobram porque os candidatos desses
+tipos têm escolas mais próximas.
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figuras/distribuicao.png}
-  \caption{Candidatos por escola e tipo de prova na melhor solução de \idGrupo{}, com um e com até
-    dois tipos por escola; o traço preto indica a capacidade da escola.}
+  \caption{Candidatos por escola e tipo de prova na melhor solução de \idGrupo{}; o traço preto
+    indica a capacidade da escola.}
   \label{fig:distribuicao}
 \end{figure}
 
 \begin{table}[htbp]
   \centering
-  \caption{Resumo por escola da melhor solução de \idGrupo{}: capacidade, tipos oferecidos,
-    candidatos, ocupação e distância média, com um e com até dois tipos por escola.}
+  \caption{Resumo por escola da melhor solução de \idGrupo{}: capacidade, tipos oferecidos (com as
+    vagas de cada um), candidatos, ocupação e distância média.}
   \label{tab:distribuicao}
   \scriptsize
-  \setlength{\tabcolsep}{4pt}
   \input{tabelas/distribuicao.tex}
-\end{table}
-
-\subsection{Um contra dois tipos por escola}\label{sec:tipos-por-escola}
-
-Repetimos o experimento principal (10 execuções por instância, $k = 10$) com até dois
-tipos por escola (\texttt{-{}-tipos-por-escola 2}), num total de \nExecDois{} execuções. A
-Tabela~\ref{tab:tipos-por-escola} compara as melhores soluções, a Figura~\ref{fig:tipos-por-escola}
-mostra o gap até o limite inferior de transporte (o único que vale para os dois valores de $K$) e a
-Tabela~\ref{tab:resultados-tipos2} traz os valores das 10 execuções.
-
-\begin{itemize}
-  \item \textbf{Viabilidade.} Com $K = 2$, \nInstDois{} instâncias têm solução, contra \nInstUm{}
-    com $K = 1$: \soDois{} passam a ser viáveis, pois dois tipos por escola dobram o número de
-    ``vagas de tipo'' (com \soDoisNmin{} escolas, por exemplo, $K = 1$ não consegue sequer
-    oferecer os seis tipos).
-  \item \textbf{Distância.} Em nenhuma instância a melhor solução com $K = 2$ fica pior que a com
-    $K = 1$ (o que é esperado, pois é uma relaxação). A distância total cai \reducao\% em média,
-    de \reducaoMin\% (\reducaoMinId) a \reducaoMax\% (\reducaoMaxId), e cai pelo menos 5\% em
-    \nReducaoCinco{} das \nComp{} instâncias. O gap médio até o LB de transporte vai de
-    \gapTranspUm\% para \gapTranspDois\%: o segundo tipo elimina, em média, \fechado\% da distância
-    entre a solução com um tipo e o LB.
-  \item \textbf{Por quê.} Com um tipo por escola, cada tipo fica, em média, com $N/6$ escolas, e
-    muitos candidatos viajam longe apenas para encontrar uma escola do seu tipo. Com dois, cada tipo
-    fica com cerca de $N/3$ escolas, e a escola mais próxima atende o tipo do candidato com
-    frequência muito maior. O ganho é pequeno onde a solução com um tipo já ficava perto do LB
-    (\reducaoMinId, I14 e \idGrupo, com gaps abaixo de 7\%).
-  \item \textbf{Uso do segundo tipo.} Na melhor solução, \duasMedia\% das escolas oferecem dois
-    tipos, em média (de \duasMin\% a \duasMax\% por instância). O modelo não atribui custo a abrir
-    um segundo tipo numa escola, então a heurística o faz sempre que isso reduz a distância. Se um
-    segundo tipo tiver custo na prática (mais coordenadores, mais malotes de provas), o natural é
-    acrescentar à função objetivo uma penalidade por escola com dois tipos.
-  \item \textbf{Tempo.} O tempo médio por execução vai de \tempoMedioUm~s para \tempoMedioDois~s
-    (Figura~\ref{fig:tempo}), pois há mais movimentos de tipo possíveis.
-\end{itemize}
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{figuras/tipos_por_escola.png}
-  \caption{Gap até o limite inferior de transporte da melhor solução com um e com até dois tipos
-    por escola. $^\dagger$: inviável com um tipo por escola.}
-  \label{fig:tipos-por-escola}
-\end{figure}
-
-\begin{table}[htbp]
-  \centering
-  \caption{Comparação entre um e até dois tipos por escola: melhor valor das 10 execuções, redução
-    da distância, gap até o limite inferior de transporte, escolas que oferecem dois tipos e
-    escolas usadas na melhor solução com até dois tipos.}
-  \label{tab:tipos-por-escola}
-  \scriptsize
-  \input{tabelas/tipos_por_escola.tex}
-\end{table}
-
-\begin{table}[htbp]
-  \centering
-  \caption{Até dois tipos por escola: valor da solução inicial e após o VND nas 10 execuções (média,
-    desvio padrão, melhor e pior).}
-  \label{tab:resultados-tipos2}
-  \scriptsize
-  \input{tabelas/resultados_tipos2.tex}
 \end{table}
 
 % =====================================================================================
 \section{Exemplo passo a passo}\label{sec:exemplo}
 
-Usamos a instância \idExemplo{} (316 candidatos, 12 escolas com duas salas cada, de 15 e
-16 lugares, ou seja, 31 lugares por escola; 53 candidatos de cada tipo M1 a M3s e 52 de M3h e M3d),
-com semente 0 e $k = 10$. O registro completo é gerado pela opção \texttt{-{}-traco} do programa.
+Usamos a instância \idExemplo{}, com semente 0 e $k = 10$. Ela tem 316 candidatos e 12 escolas,
+cada uma com duas salas, de 15 e 16 lugares (31 lugares por escola). São 53 candidatos de cada
+tipo de M1 a M3s e 52 de M3h e de M3d. O registro completo da execução é gerado pela opção
+\texttt{-{}-traco} do programa.
 
-\textbf{Fase A ($K = 1$).} A alocação provisória estima, por exemplo, para a escola E1:
-M1 = 5, M2 = 6, M3e = 8, M3s = 3, M3h = 3, M3d = 4. Com um tipo por escola, E1 fica com M3e, o de
-maior demanda estimada, e as suas duas salas recebem M3e. Repetindo para as 12 escolas, M1, M2, M3e
-e M3h ficam com duas escolas cada (62 vagas), M3s com três (93 vagas) e M3d com apenas uma (31 vagas
-para 52 candidatos). A etapa de cobertura muda E7 inteira de M3s para M3d, o que é possível porque
-M3s continua com 62 vagas para 53 candidatos. Ao final, cada tipo tem 62 vagas.
+Na fase A, a alocação provisória estima para a escola E1 as demandas M1 = 5, M2 = 6, M3e = 8,
+M3s = 3, M3h = 3 e M3d = 4. E1 fica com M3e e M2, os dois de maior demanda estimada. Pelo
+\emph{best-fit}, a sala de 15 lugares vai para M3e (falta 8) e a de 16, para M2 (falta 6).
+Repetindo o processo, todas as 12 escolas ficam com dois tipos. Mas só E7 e E10 escolhem M3d, que
+fica com 31 vagas para 52 candidatos, e M2 também fica descoberto. A etapa de cobertura então muda
+três salas: a sala 1 de E8 passa de M3s para M3d (faltavam 21 vagas de M3d), a sala 1 de E4 passa
+de M1 para M2 (faltavam 7 de M2) e a sala 2 de E12 passa de M1 para M3d (faltavam 5). Cada mudança
+só é aceita porque o tipo de origem continua coberto. No fim, cada tipo tem de 61 a 63 vagas para
+52 ou 53 candidatos.
 
-\textbf{Fase B.} Os 10 candidatos de maior arrependimento formam a RCL (C213, C294, C172, \ldots,
-com arrependimentos de 4,03 a 3,65). O sorteio escolhe C287 (tipo M3s); as sete escolas mais
-próximas dele não oferecem M3s, e ele vai para E4, sala 1. C287 sai da RCL e entra C290, o 11º da
-fila. O processo segue até os 316 candidatos estarem alocados, com custo inicial de 1297,64.
+Na fase B, os 10 candidatos de maior arrependimento formam a RCL (C213, C294, C172, \ldots, com
+arrependimentos de 4,03 a 3,65). O primeiro sorteado é C287, do tipo M3s. As quatro escolas mais
+próximas dele (E6, E9, E1 e E5) não têm sala de M3s, e ele vai para a sala 1 de E3, a 8,12 de
+distância. C287 sai da RCL e entra C290, o 11º da fila. O processo continua até os 316 candidatos
+estarem alocados, com custo inicial de 1064,53.
 
-\textbf{VND ($K = 1$).} N1 não encontra melhora (a fase B já pôs cada um na escola mais próxima
-com vaga). N2 aplica 11 trocas e leva o custo a 1261,78 (por exemplo, C155 de E6 troca com C268 de
-E9, com ganho de 3,40). N3 a N6 não melhoram: com a cobertura justa (62 vagas para 52 ou 53
-candidatos), nenhuma escola pode mudar de tipo sozinha. N7 troca os tipos de E1 (M3e) e E6 (M2), com
-62 candidatos mudando de escola e ganho de 5,57. A VND alterna N2 e N7 mais três vezes (E1 e E3,
-E2 e E3, E6 e E9) e para em \finalExemploUm, uma melhoria de 7,6\% sobre a solução inicial e
-\gapExemploUm\% acima do ótimo (\refExemploUm, provado pelo MIP).
-
-\textbf{Com até dois tipos por escola.} Na mesma instância e semente, E1 recebe M3e e M2 (os dois
-de maior demanda estimada): a sala de 15 lugares vai para M3e (falta 8) e a de 16, para M2 (falta 6).
-Todas as 12 escolas ficam com dois tipos, e a cobertura muda só três salas (E8 sala 1 de M3s para
-M3d, E4 sala 1 de M1 para M2 e E12 sala 2 de M1 para M3d). A solução inicial custa 1064,53, já
-abaixo da solução \emph{final} com um tipo. O VND usa N5 (trocar as duas salas de uma escola) em 10
-movimentos e N7 em 11; o maior ganho vem de uma troca em N7 que leva M3h de E5 para E2 e M3e de E2
-para E5 (36 candidatos mudam, ganho de 37,93). A busca termina em \finalExemploDois{}
-(\gapExemploDois\% acima do ótimo, \refExemploDois), \reducaoExemplo\% abaixo do resultado com um tipo.
+No VND, a N1 não encontra melhora, já que a fase B pôs cada candidato na escola mais próxima com
+vaga. A N2 faz 40 trocas e leva o custo a 991,37; numa delas, C255 (E3) troca com C206 (E4) e o
+custo cai 6,32. A N3 encontra três cadeias, como C288 de E3 para E7, C191 de E7 para E2 e C35 de E2
+para E3 (ganho de 0,30), e o custo vai a 990,93. A N4 não melhora, e a N5 troca os tipos das salas
+de E4 (16 lugares de M2 e 15 de M3s), com ganho de 2,41, o que faz a VND voltar para a N1. Na
+execução inteira, a VND aplica 16 movimentos da N1, 63 da N2, 19 da N3, 10 da N5 e 11 da N7. O
+maior ganho vem de uma troca da N7 que leva M3h de E5 para E2 e M3e de E2 para E5: 36 candidatos
+mudam de escola, e o custo cai 37,93. A busca termina em \finalExemplo, uma melhoria de 18,7\%
+sobre a solução inicial, \gapExemplo\% acima do ótimo provado pelo MIP (\refExemplo).
 
 % =====================================================================================
 \section{Onde a abordagem não vai bem}\label{sec:ruim}
 
-\textbf{Instâncias com cobertura justa, com um tipo por escola.} Com $K = 1$, os piores
-resultados são \piorUmIdUm{} (\piorUmGapUm\% acima do ótimo provado pelo MIP), \piorDoisIdUm{}
-(\piorDoisGapUm\%) e \piorTresIdUm{} (\piorTresGapUm\%), as duas últimas comparadas à busca exata nos
-tipos. Identificamos três causas:
-\begin{enumerate}
-  \item \textbf{A escola é indivisível e a cobertura é justa.} Com um tipo por escola, cada tipo
-    precisa de um conjunto de escolas cuja capacidade cubra a sua demanda, e quase não há sobra. Em
-    \piorUmIdUm{} (\piorUmMUm{} candidatos, \piorUmNUm{} escolas), 217 candidatos são do tipo M1,
-    que fica com 218 vagas; qualquer mudança de uma escola, ou troca entre duas escolas de
-    capacidades diferentes, descobre algum tipo. O ótimo distribui os tipos de forma bem diferente,
-    e chegar a ele exige mudar os tipos de três ou mais escolas ao mesmo tempo. Mesmo a busca exata
-    nos tipos, que usa as mesmas vizinhanças, melhora só 1,8\% a solução da heurística nessa
-    instância: o problema é o alcance das vizinhanças, não a avaliação.
-  \item \textbf{A avaliação de N6 e N7 é gulosa.} As chegadas só ocupam as vagas novas e os
-    despejos vão para a vaga mais próxima disponível, sem reorganizar o restante. Um movimento de
-    tipo que só compensaria depois de reotimizar a alocação inteira é rejeitado. A busca exata nos
-    tipos mede esse efeito: avaliando os mesmos vizinhos pela alocação ótima, ela melhora a
-    solução final da heurística em \nBuscaTipos{} das \nInstUm{} instâncias (\buscaTiposMedia\% em
-    média, até \buscaTiposMax\% em \buscaTiposMaxId), e em \nBuscaTiposUm{} delas a melhora passa
-    de 1\%. É a principal causa dos gaps de \piorDoisIdUm{} e \piorTresIdUm.
-  \item \textbf{O arrependimento da fase B ignora o tipo.} Ele é calculado entre as duas escolas
-    mais próximas, mesmo que elas não ofereçam o tipo do candidato. Com $K = 1$ isso é frequente:
-    no exemplo, C287 está entre os 10 primeiros da fila, mas as sete escolas mais próximas não
-    oferecem M3s, e o arrependimento não reflete a perda real.
-\end{enumerate}
-Com $K = 2$ o problema da causa 1 se atenua, porque cada escola tem duas partes ajustáveis, e os
-gaps caem (\nInstDois{} instâncias com \gapFinDois\% em média). O pior caso com $K = 2$ é
-\piorUmIdDois{} (\piorUmGapDois\% acima do ótimo provado), também uma instância pequena com poucas
-salas por escola, em que a divisão das salas entre os dois tipos é grosseira.
+Os piores resultados são \piorUmId{} (\piorUmGap\% acima do ótimo provado pelo MIP), \piorDoisId{}
+(\piorDoisGap\%) e \piorTresId{} (\piorTresGap\%). As três são pequenas e têm ótimo conhecido. Nas
+instâncias grandes a referência é quase sempre a própria heurística, e o que podemos afirmar sobre
+elas é o gap até o LB (Seção~\ref{sec:resultados}). Encontramos três causas para esses casos.
 
-\textbf{Instâncias inviáveis.} \idInviavel{} (100 candidatos, 5 escolas, 20 salas de 5 ou 6
-lugares, 105 vagas) não tem solução nem com $K = 2$. A demanda é de 16 ou 17 candidatos por tipo, e
-um tipo com 17 candidatos precisa de três salas com pelo menos duas de 6 lugares ($6+6+5$), mas só
-há quatro salas de 6, o que atende no máximo dois desses tipos; assim, não há solução nem sem limite
-de tipos por escola. Com $K = 1$, outras três instâncias são inviáveis: \soDois. Em I02 há só cinco
-escolas para seis tipos; em I12 e I22 a capacidade total sobra, mas nenhuma divisão das escolas
-inteiras entre os tipos cobre todas as demandas. Em todos esses casos a abordagem não ``vai mal'':
-não existe solução, e a fase A o reconhece pelo reparo exato, sem gastar tempo de busca. A folga
-total esconde o problema, que só aparece ao considerar a granularidade das escolas e das salas.
+A primeira é que o ótimo distribui os tipos de um jeito muito diferente. \piorUmId{} tem
+\piorUmM{} candidatos e \piorUmN{} escolas, cada uma com duas a quatro salas de 4 a 16 lugares.
+Comparando os tipos da melhor solução da heurística com os do ótimo do MIP, só uma das 12 escolas
+oferece o mesmo par de tipos nas duas. Para chegar ao ótimo seria preciso mudar os tipos de várias
+escolas ao mesmo tempo, mas cada movimento de N4 a N7 mexe em no máximo duas escolas e só é aceito
+se melhorar a solução por conta própria. Com poucas salas por escola, e de tamanhos variados, a
+divisão das vagas entre os dois tipos é grosseira, e muitos dos movimentos intermediários pioram a
+solução.
+
+A segunda é que a avaliação das vizinhanças de tipos é gulosa. As chegadas só ocupam as vagas
+novas, e os despejos vão para a vaga mais próxima disponível, sem reorganizar o resto da alocação.
+Um movimento de tipo que só compensaria depois de reotimizar a alocação inteira acaba rejeitado.
+
+A terceira está na fase B: o arrependimento é calculado entre as duas escolas mais próximas, mesmo
+que elas não ofereçam o tipo do candidato. No exemplo, C287 está entre os 10 primeiros da fila,
+mas nenhuma das quatro escolas mais próximas dele tem sala de M3s, e o arrependimento não reflete
+o que ele realmente perde.
+
+Há ainda uma instância sem solução. \idInviavel{} tem 100 candidatos, 5 escolas e 20 salas de 5
+ou 6 lugares, num total de 105 vagas. A demanda é de 16 ou 17 candidatos por tipo, e um tipo com
+17 candidatos precisa de três salas, sendo pelo menos duas de 6 lugares ($6+6+5$). Só existem
+quatro salas de 6, o que atende no máximo dois desses tipos, então a instância não tem solução nem
+sem limite de tipos por escola. A folga total de 5\% esconde o problema, que só aparece quando se
+olha o tamanho de cada sala. A fase A detecta a inviabilidade pelo reparo exato, sem gastar tempo
+de busca.
 
 % =====================================================================================
 \section{Conclusões}\label{sec:conclusao}
 
 Propusemos uma heurística construtiva em duas fases e uma VND com sete vizinhanças para o problema
 de localização de locais de prova em que cada sala aplica um único tipo de prova e cada escola
-oferece no máximo $K$ tipos, com $K \in \{1, 2\}$ escolhido por parâmetro. A etapa de cobertura da
-fase A, com o reparo exato quando a cobertura gulosa trava, garante que a construção nunca trava em
-instâncias viáveis, e todas as soluções geradas são viáveis, dispensando penalização. Com um tipo
-por escola, nas \nInstUm{} instâncias viáveis da turma, o método termina \gapFinUm\% acima do
-melhor valor conhecido em média e leva \tempoMedioUm~s por execução. Com até dois tipos, que torna
-\nInstDois{} instâncias viáveis, a distância cai \reducao\% em média (até \reducaoMax\%), ao custo
-de um tempo cerca de cinco vezes maior (\tempoMedioDois~s). Se um segundo tipo por escola é
-aceitável na prática é uma decisão da organização do exame; o experimento mede quanto ele vale.
+oferece no máximo dois. A etapa de cobertura da fase A, com o reparo exato para quando a cobertura
+gulosa trava, faz a construção funcionar em todas as instâncias viáveis, e todas as soluções
+geradas são viáveis, sem precisar de penalização. Nas \nInst{} instâncias viáveis da turma, o
+método melhora a solução inicial em \melhoria\% e termina, em média, \gapFin\% acima do melhor
+valor conhecido e \gapLb\% acima do limite inferior, em \tempoMedio~s por execução. Em
+\melhorQueMip{} das \nInst{} instâncias a heurística encontra soluções melhores que o MIP de 60~s.
 
-\textbf{Principais dificuldades.} (i) A heterogeneidade das instâncias: versões anteriores usavam
-seis formatos de arquivo, e a versão final ainda traz variações de cabeçalho, arquivos sem dados,
-duplicatas e distâncias em unidades diferentes, o que exigiu um leitor robusto e a comparação por
-gap. (ii) A cobertura com um tipo por escola: a cobertura gulosa trava em metade das instâncias
-(\reparoInstUm{} de \nInstUm), o que levou ao reparo exato. (iii) As vizinhanças de tipos: com a
-cobertura justa, mudar o tipo de uma escola quase nunca é viável, o que levou à N7 (trocar os
-tipos de duas escolas). (iv) A falta de ótimos provados nas instâncias grandes, em que o MIP não
-encontra solução em 60~s e o limite inferior é fraco, contornada com a busca exata nos tipos como
-referência.
+A primeira dificuldade foi a variedade das instâncias. Versões anteriores usavam seis formatos de
+arquivo, e a versão final ainda tem cabeçalhos diferentes, arquivos sem dados, duplicatas e
+distâncias em unidades diferentes; precisamos de um leitor tolerante a essas variações e de
+comparar os resultados por gap. Cobrir os tipos com salas indivisíveis também deu trabalho: a
+cobertura gulosa trava em \reparoInst{} das \nInst{} instâncias, o que nos levou ao reparo exato.
+Com a cobertura justa, mudar um tipo inteiro de uma escola raramente é viável, e foi por isso que
+criamos a N7, que troca os tipos de duas escolas, e a N5, que troca os tipos de duas salas. Por
+fim, faltam ótimos provados nas instâncias grandes, onde o MIP de 60~s fica pior que a heurística
+e o limite inferior às vezes é fraco.
 
-\textbf{Melhorias possíveis.}
+Algumas melhorias possíveis:
 \begin{itemize}
-  \item Avaliar os vizinhos de N6 e N7 com reotimização da alocação, ao menos para os melhores
-    candidatos segundo a avaliação gulosa: a busca exata nos tipos mostra um ganho de
-    \buscaTiposMedia\% em média, e de até \buscaTiposMax\%.
-  \item Acrescentar uma vizinhança de rotação de tipos entre três escolas, ou uma busca local
+  \item avaliar os vizinhos de N4 a N7 reotimizando a alocação, pelo menos para os mais promissores
+    segundo a avaliação gulosa;
+  \item acrescentar uma vizinhança que rotacione tipos entre três escolas, ou uma busca local
     iterada (ILS) que perturbe os tipos de algumas escolas e reaplique a VND, para escapar dos
-    ótimos locais de tipos (causa 1 da Seção~\ref{sec:ruim}) e gerar diversidade real entre
-    execuções.
-  \item Calcular o arrependimento apenas entre escolas que oferecem o tipo do candidato.
-  \item Com até dois tipos por escola, penalizar o segundo tipo na função objetivo, para usá-lo
-    apenas onde o ganho em distância compensa.
+    ótimos locais de tipos (a primeira causa da Seção~\ref{sec:ruim}) e criar diversidade de fato
+    entre as execuções;
+  \item calcular o arrependimento só entre as escolas que oferecem o tipo do candidato;
+  \item penalizar o segundo tipo na função objetivo, para que ele só seja usado onde o ganho em
+    distância compensa.
 \end{itemize}
 
 \bibliographystyle{sbc}

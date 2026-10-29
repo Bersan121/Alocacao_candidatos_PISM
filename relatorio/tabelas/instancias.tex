@@ -1,34 +1,35 @@
-\begin{tabular}{llrrrrl}
+\begin{tabular}{llrrrrcc}
 \hline
-ID & Arquivo & $M$ & $N$ & Salas & Folga (\%) & Observação \\
+ & & & & & & \multicolumn{2}{c}{Viável com} \\
+ID & Arquivo & $M$ & $N$ & Salas & Folga (\%) & 1 tipo & 2 tipos \\
 \hline
-I01 & \texttt{Instancia2\_G2} & 109 & 5 & 12 & 11,0 &  \\
-I02 & \texttt{instancia1\_G8} & 316 & 12 & 24 & 17,7 &  \\
-I03 & \texttt{instancia2\_G8} & 316 & 12 & 24 & 17,7 &  \\
-I04 & \texttt{instancia\_1\_G13} & 360 & 14 & 43 & 15,3 &  \\
-I05 & \texttt{instancia\_2\_G14} & 362 & 12 & 39 & 5,8 &  \\
-I06 & \texttt{instancia\_1\_G14} & 370 & 12 & 39 & 16,8 &  \\
-I07 & \texttt{instancia\_2\_G13} & 382 & 16 & 44 & 7,6 &  \\
-I08 & \texttt{Instancia1\_G7(1)} & 3357 & 11 & 62 & 17,7 &  \\
-I09 & \texttt{Instancia1\_G11} & 3452 & 10 & 88 & 15,6 &  \\
-I10 & \texttt{Instancia1\_G9} & 3696 & 14 & 150 & 17,7 &  \\
-I11 & \texttt{instancia\_2} & 3858 & 10 & 97 & 19,5 & cópia do G3; pasta \texttt{instancias} \\
-I12 & \texttt{Instancia1\_G12} & 3860 & 15 & 205 & 16,2 &  \\
-I13 & \texttt{Instancia2\_G12} & 3860 & 15 & 205 & 16,2 &  \\
-I14 & \texttt{Instancia2\_G4} & 3970 & 12 & 142 & 17,6 &  \\
-I15 & \texttt{Instancia1\_G4} & 3995 & 12 & 145 & 17,6 &  \\
-I16 & \texttt{Instancia2\_G9} & 4124 & 14 & 150 & 5,5 &  \\
-I17 & \texttt{Instancia1\_G5} & 4213 & 15 & 117 & 10,7 &  \\
-I18 & \texttt{Instancia2\_G1} & 4442 & 15 & 157 & 18,4 &  \\
-I19 & \texttt{Instancia2\_G11} & 4454 & 15 & 122 & 23,4 &  \\
-I20 & \texttt{Instancia1\_G1} & 4518 & 15 & 125 & 6,9 &  \\
-I21 & \texttt{Instancia2\_G5} & 4628 & 15 & 125 & 8,1 &  \\
-I22 & \texttt{Instancia1\_G10} & 4744 & 15 & 101 & 10,1 &  \\
-I23 & \texttt{Instancia2\_G6} & 4809 & 15 & 177 & 7,5 &  \\
-I24 & \texttt{Instancia2\_G10} & 5116 & 15 & 101 & 2,1 &  \\
-I25 & \texttt{Instancia1\_G6} & 5203 & 15 & 248 & 11,1 &  \\
-I26 & \texttt{instancia\_1} & 5917 & 20 & 197 & 6,9 & cópia do G3; pasta \texttt{instancias} \\
-I27 & \texttt{Instancia2\_G7} & 6798 & 20 & 113 & 2,1 &  \\
-I28 & \texttt{Instancia1\_G2} & 100 & 5 & 20 & 5,0 & inviável \\
+I01 & \texttt{Instancia1\_G2} & 100 & 5 & 20 & 5,0 & não & não \\
+I02 & \texttt{Instancia2\_G2} & 109 & 5 & 12 & 11,0 & não & sim \\
+I03 & \texttt{instancia1\_G8} & 316 & 12 & 24 & 17,7 & sim & sim \\
+I04 & \texttt{instancia2\_G8} & 316 & 12 & 24 & 17,7 & sim & sim \\
+I05 & \texttt{instancia\_1\_G13} & 360 & 14 & 43 & 15,3 & sim & sim \\
+I06 & \texttt{instancia\_2\_G14} & 362 & 12 & 39 & 5,8 & sim & sim \\
+I07 & \texttt{instancia\_1\_G14} & 370 & 12 & 39 & 16,8 & sim & sim \\
+I08 & \texttt{instancia\_2\_G13} & 382 & 16 & 44 & 7,6 & sim & sim \\
+I09 & \texttt{Instancia1\_G7(1)} & 3357 & 11 & 62 & 17,7 & sim & sim \\
+I10 & \texttt{Instancia1\_G11} & 3452 & 10 & 88 & 15,6 & sim & sim \\
+I11 & \texttt{Instancia1\_G9} & 3696 & 14 & 150 & 17,7 & sim & sim \\
+I12 & \texttt{instancia\_2}$^\ddagger$ & 3858 & 10 & 97 & 19,5 & não & sim \\
+I13 & \texttt{Instancia1\_G12} & 3860 & 15 & 205 & 16,2 & sim & sim \\
+I14 & \texttt{Instancia2\_G12} & 3860 & 15 & 205 & 16,2 & sim & sim \\
+I15 & \texttt{Instancia2\_G4} & 3970 & 12 & 142 & 17,6 & sim & sim \\
+I16 & \texttt{Instancia1\_G4} & 3995 & 12 & 145 & 17,6 & sim & sim \\
+I17 & \texttt{Instancia2\_G9} & 4124 & 14 & 150 & 5,5 & sim & sim \\
+I18 & \texttt{Instancia1\_G5} & 4213 & 15 & 117 & 10,7 & sim & sim \\
+I19 & \texttt{Instancia2\_G1} & 4442 & 15 & 157 & 18,4 & sim & sim \\
+I20 & \texttt{Instancia2\_G11} & 4454 & 15 & 122 & 23,4 & sim & sim \\
+I21 & \texttt{Instancia1\_G1} & 4518 & 15 & 125 & 6,9 & sim & sim \\
+I22 & \texttt{Instancia2\_G5} & 4628 & 15 & 125 & 8,1 & não & sim \\
+I23 & \texttt{Instancia1\_G10} & 4744 & 15 & 101 & 10,1 & sim & sim \\
+I24 & \texttt{Instancia2\_G6} & 4809 & 15 & 177 & 7,5 & sim & sim \\
+I25 & \texttt{Instancia2\_G10} & 5116 & 15 & 101 & 2,1 & sim & sim \\
+I26 & \texttt{Instancia1\_G6} & 5203 & 15 & 248 & 11,1 & sim & sim \\
+I27 & \texttt{instancia\_1}$^\ddagger$ & 5917 & 20 & 197 & 6,9 & sim & sim \\
+I28 & \texttt{Instancia2\_G7} & 6798 & 20 & 113 & 2,1 & sim & sim \\
 \hline
 \end{tabular}
